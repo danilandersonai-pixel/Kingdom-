@@ -6,7 +6,7 @@ import type { Renderer } from '../render/renderer';
 import type { World } from '../game/world';
 import type { Monarch } from '../game/entities/monarch';
 import { blit } from '../engine/sprite';
-import { hudCoin, hudGem, coinSprites, gemSprite } from '../art/items';
+import { hudCoin, hudGem, coinSprites, gemSprite, pouchSprite } from '../art/items';
 import { drawText } from '../engine/font';
 import { PURSE } from '../game/config';
 import { clamp, toRoman } from '../engine/math';
@@ -68,46 +68,38 @@ export class Hud {
   private drawPurse(ctx: CanvasRenderingContext2D, r: Renderer, m: Monarch): void {
     if (this.purseAlpha <= 0.01) return;
     const a = this.purseAlpha;
-    const cap = PURSE.full;
-    const perRow = 10;
-    const rows = Math.ceil(cap / perRow);
-    const cw = 8;
-    const panelW = perRow * cw + 10;
-    const panelH = rows * 6 + 12 + 9;
-    const x0 = Math.floor(r.w / 2 - panelW / 2);
-    const y0 = 6;
-    ctx.globalAlpha = a * 0.55;
-    ctx.fillStyle = '#1a120c';
-    ctx.fillRect(x0, y0, panelW, panelH);
-    ctx.globalAlpha = a * 0.8;
-    ctx.fillStyle = '#6a4a2a';
-    ctx.fillRect(x0, y0, panelW, 1);
-    ctx.fillRect(x0, y0 + panelH - 1, panelW, 1);
-    ctx.fillRect(x0, y0, 1, panelH);
-    ctx.fillRect(x0 + panelW - 1, y0, 1, panelH);
+    const bag = pouchSprite();
+    const cx = Math.floor(r.w / 2);
+    const top = 4;
     ctx.globalAlpha = a;
+    blit(ctx, bag, cx, top + bag.h);
+    // Монеты лежат горкой внутри мешочка: снизу вверх, по 10 в ряд.
     const coin = hudCoin();
-    // Самоцветы занимают по 3 места в начале кошелька, дальше монеты.
-    const gemSlots = m.gems * PURSE.gemSlots;
-    for (let i = 0; i < cap; i++) {
+    const gem = hudGem();
+    const perRow = 10;
+    const inner = { left: cx - 27, bottom: top + bag.h - 5 };
+    let slot = 0;
+    const place = (i: number): [number, number] => {
       const row = Math.floor(i / perRow);
       const col = i % perRow;
-      const x = x0 + 9 + col * cw;
-      const y = y0 + 12 + row * 6;
-      if (i < gemSlots) {
-        if (i % PURSE.gemSlots === 1) blit(ctx, hudGem(), x, y + 1);
-      } else if (i < gemSlots + m.coins) blit(ctx, coin, x, y);
-      else {
-        ctx.globalAlpha = a * 0.25;
-        ctx.fillStyle = '#c8a860';
-        ctx.fillRect(x - 1, y - 4, 3, 3);
-        ctx.globalAlpha = a;
-      }
+      const shift = row % 2 === 0 ? 0 : 2.5;
+      return [inner.left + 3 + col * 5.2 + shift, inner.bottom - row * 4];
+    };
+    for (let i = 0; i < m.gems; i++) {
+      const [x, y] = place(slot);
+      blit(ctx, gem, x + 2, y);
+      slot += PURSE.gemSlots;
     }
-    // Переполнение: монеты горкой сверху.
+    const inside = Math.min(m.coins, Math.max(0, PURSE.full - slot));
+    for (let i = 0; i < inside; i++) {
+      const [x, y] = place(slot + i);
+      blit(ctx, coin, x, y);
+    }
+    // Переполнение: монеты горкой над горлышком — вот-вот посыплются.
     const over = m.purseSlots - PURSE.full;
-    if (over > 0) {
-      for (let i = 0; i < over; i++) blit(ctx, coin, x0 + panelW / 2 - over * 4 + i * 8, y0 + 5);
+    for (let i = 0; i < over; i++) {
+      const row = Math.floor(i / 6);
+      blit(ctx, coin, cx - 13 + (i % 6) * 5 + (row % 2) * 2, top + 9 - row * 4);
     }
     ctx.globalAlpha = 1;
   }
@@ -120,7 +112,7 @@ export class Hud {
     const a = t < 1.2 ? t / 1.2 : t > dur - 2 ? (dur - t) / 2 : 1;
     const text = toRoman(this.dayBanner.day);
     const scale = text.length > 5 ? 3 : 4;
-    drawText(ctx, text, Math.floor(r.w / 2), Math.floor(r.h * 0.1), { align: 'center', scale, color: blood ? '#5a0e10' : '#16120e', alpha: a * 0.85, shadow: null });
+    drawText(ctx, text, Math.floor(r.w / 2), Math.floor(r.h * 0.19), { align: 'center', scale, color: blood ? '#5a0e10' : '#16120e', alpha: a * 0.85, shadow: null });
   }
 
   private drawBanners(ctx: CanvasRenderingContext2D, r: Renderer, w: World): void {

@@ -208,7 +208,9 @@ export class Person extends Entity {
       this.fieldFarm = 0;
       this.fieldIndex = -1;
     }
-    this.toolTarget = null;
+    if (this.world) this.releaseTool();
+    else this.toolTarget = null;
+    if (this.coinTarget) this.releaseCoin();
     this.coinTarget = 0;
     this.y = 0;
   }
@@ -433,7 +435,7 @@ export class Person extends Entity {
     const tc = townX(w);
     const danger = this.greedNear(6 * M);
     if (!w.time.isDay || danger) {
-      this.toolTarget = null;
+      this.releaseTool();
       if (this.coinTarget) this.releaseCoin();
       if (danger && Math.abs(danger.x - this.x) < 3 * M) this.goTo(this.x + Math.sign(this.x - danger.x) * 30, true);
       else if (!insideKingdom(w, this.x, 10) || Math.abs(this.x - tc) > 60) this.goTo(tc + fxRng.range(-40, 40), true);
@@ -449,6 +451,16 @@ export class Person extends Entity {
     // Собирать брошенные монеты и нести монарху.
     if (this.coins < this.maxCarry && this.collectCoins(30 * M)) return;
     this.wander(tc + (this.id % 2 ? -1 : 1) * 30, 50, 3);
+  }
+
+  /** Отказаться от похода за инструментом (снять бронь). */
+  private releaseTool(): void {
+    const t = this.toolTarget;
+    if (t && t.kind === 'ground') {
+      const item = this.world.all<DroppedTool>('item').find((i) => i.id === t.id) as DroppedTool | undefined;
+      if (item && item.claimedBy === this.id) item.claimedBy = 0;
+    }
+    this.toolTarget = null;
   }
 
   private releaseCoin(): void {

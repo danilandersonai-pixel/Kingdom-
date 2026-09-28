@@ -525,3 +525,41 @@ export class CitizenHouse extends Structure {
 }
 
 void WALL_TIERS;
+
+// ——— Кооператив: новая корона товарищу за 8 монет ———
+export class CrownOffer extends Structure {
+  readonly type = 'banner' as const;
+  ownerId: number;
+  constructor(ownerId: number) {
+    super();
+    this.ownerId = ownerId;
+    this.z = 50;
+    this.payWidth = 16;
+    this.payPriority = 5;
+  }
+  private owner(): Monarch | undefined {
+    return this.world.all<Monarch>('monarch').find((m) => m.id === this.ownerId);
+  }
+  override slotY(): number {
+    return 40;
+  }
+  override price(m: Monarch): number {
+    const o = this.owner();
+    if (!o || o.hasCrown || m.id === this.ownerId) return 0;
+    return PRICES.coopCrown;
+  }
+  override onPaid(_m: Monarch): void {
+    const o = this.owner();
+    if (o) o.regainCrown();
+    this.world.banner('НОВАЯ КОРОНА', 'Товарищ снова правит');
+    this.dead = true;
+  }
+  override update(): void {
+    const o = this.owner();
+    if (!o || o.hasCrown) {
+      this.dead = true;
+      return;
+    }
+    this.x = o.x;
+  }
+}

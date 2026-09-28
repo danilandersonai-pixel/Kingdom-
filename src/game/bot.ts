@@ -18,17 +18,25 @@ interface BotState {
   dropping: boolean;
   lastPress: number;
   think: number;
+  /** До какого момента держаться выбранной цели (чтобы не метаться). */
+  commit: number;
+  clock: number;
 }
 
 export function makeBot(): (m: Monarch, dt: number) => Partial<Control> {
-  const st: BotState = { goal: 'idle', target: null, dropping: false, lastPress: 0, think: 0 };
+  const st: BotState = { goal: 'idle', target: null, dropping: false, lastPress: 0, think: 0, commit: 0, clock: 0 };
   return (m, dt) => {
     const w = m.world;
     st.think -= dt;
     st.lastPress += dt;
-    if (st.think <= 0 || st.target === null) {
+    st.clock += dt;
+    const committed = (st.goal === 'pay' || st.goal === 'recruit' || st.goal === 'chest') && st.clock < st.commit && st.target !== null;
+    const danger = w.all('greed').some((g) => Math.abs(g.x - m.x) < 9 * M);
+    if ((st.think <= 0 || st.target === null) && (!committed || danger)) {
       st.think = 0.5;
+      const before = st.goal + st.target;
       decide(m, st);
+      if (st.goal + st.target !== before) st.commit = st.clock + 8;
     }
     const out: Partial<Control> = { axis: 0, run: false, drop: false, dropPressed: false };
     if (st.target !== null) {

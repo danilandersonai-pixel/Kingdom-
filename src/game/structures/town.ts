@@ -2,6 +2,7 @@
 // и лавки инструментов со стойками, откуда жители забирают инструменты.
 
 import { Structure } from './structure';
+import type { Entity } from '../entity';
 import type { Monarch } from '../entities/monarch';
 import type { Renderer } from '../../render/renderer';
 import type { Light } from '../../render/lighting';
@@ -185,6 +186,15 @@ export class Shop extends Structure {
     this.stock--;
     this.reserved = Math.max(0, this.reserved - 1);
     return true;
+  }
+
+  override update(): void {
+    // Бронь пересчитывается честно: сколько жителей сейчас реально идут сюда.
+    let n = 0;
+    for (const p of this.world.all<Entity & { toolTarget: { kind: string; id: number } | null }>('person')) {
+      if (p.toolTarget && p.toolTarget.kind === 'shop' && p.toolTarget.id === this.id) n++;
+    }
+    this.reserved = n;
   }
 
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {

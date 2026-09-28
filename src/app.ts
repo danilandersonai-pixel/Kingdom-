@@ -17,6 +17,7 @@ import { Menu } from './ui/menu';
 import { drawMap } from './ui/map';
 import { Campaign, randomRuler } from './game/campaign';
 import type { CentralDock } from './game/structures/boat';
+import { CrownOffer } from './game/structures/special';
 import { Coin } from './game/entities/pickups';
 import { drawText } from './engine/font';
 import { debugSetup } from './game/debug';
@@ -153,7 +154,7 @@ export class App {
       this.hud.showDay(d);
       this.autosave();
     });
-    world.on('crownTaken', () => this.onCrownTaken());
+    world.on('crownTaken', (ownerId: number) => this.onCrownTaken(ownerId));
     world.on('crownKnocked', () => this.checkCrowns());
     world.on('sail', (m: Monarch, dock: CentralDock) => this.openChoose(m, dock));
     world.banner(`ОСТРОВ ${toRoman(world.island.index)}`, undefined, 4);
@@ -164,9 +165,13 @@ export class App {
     saveCampaign(this.campaign, this.world, this.monarchs);
   }
 
-  private onCrownTaken(): void {
+  private onCrownTaken(ownerId: number): void {
     // В кооперативе проигрыш, только если без короны оба.
-    if (this.monarchs.some((m) => m.hasCrown)) return;
+    if (this.monarchs.some((m) => m.hasCrown)) {
+      this.world.add(new CrownOffer(ownerId));
+      this.world.banner('КОРОНА УТРАЧЕНА', 'Товарищ может выковать новую за 8 монет');
+      return;
+    }
     this.world.crownLost = true;
     this.setState('gameover');
   }
@@ -515,11 +520,13 @@ export class App {
     const ctx = this.screen.ctx;
     const { w, h } = this.screen;
     const half = Math.floor(h / 2);
+    // В каждой половине — полоса кадра с землёй, отражением и частью неба.
+    const band = Math.max(0, Math.min(h - half, this.renderer.groundY + 30 - half));
     this.renderView(this.cameras[1].x, this.monarchs[1], true);
     const [tmp, tctx] = this.coopBuffer(w, h);
-    tctx.drawImage(this.screen.buffer, 0, Math.round(h * 0.18), w, half, 0, 0, w, half);
+    tctx.drawImage(this.screen.buffer, 0, band, w, half, 0, 0, w, half);
     this.renderView(this.cameras[0].x, this.monarchs[0], true);
-    ctx.drawImage(this.screen.buffer, 0, Math.round(h * 0.18), w, half, 0, 0, w, half);
+    ctx.drawImage(this.screen.buffer, 0, band, w, half, 0, 0, w, half);
     ctx.drawImage(tmp, 0, 0, w, half, 0, half, w, half);
     // Разделитель: вид меняется с эпохой.
     const tech = this.world.meta.tech;

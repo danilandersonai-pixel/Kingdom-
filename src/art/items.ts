@@ -137,3 +137,31 @@ export function purseSprite(): Sprite {
   );
   return purse;
 }
+
+/** Кожаный мешочек-кошелёк: внутри видна горка монет. */
+let pouch: Sprite | null = null;
+export function pouchSprite(): Sprite {
+  if (pouch) return pouch;
+  const W = 64;
+  const H = 36;
+  const [c, ctx] = makeCanvas(W, H);
+  const cx = W / 2;
+  // Тело мешка.
+  ellipse(ctx, cx, H - 15, 31, 15, '#3a2414');
+  ellipse(ctx, cx, H - 16, 29, 13.5, '#6a4426');
+  ellipse(ctx, cx, H - 17, 26, 11, '#1e140c');
+  // Горлышко и завязка.
+  ctx.fillStyle = '#6a4426';
+  ctx.fillRect(cx - 14, 4, 28, 5);
+  ctx.fillStyle = '#8a5e36';
+  ctx.fillRect(cx - 14, 4, 28, 1);
+  ctx.fillStyle = '#c8a060';
+  ctx.fillRect(cx - 16, 8, 32, 1);
+  ctx.fillRect(cx + 12, 9, 1, 4);
+  ctx.fillRect(cx + 14, 9, 1, 3);
+  // Блики на коже.
+  line(ctx, cx - 24, H - 22, cx - 19, H - 27, '#8a5e36');
+  line(ctx, cx + 20, H - 7, cx + 25, H - 11, '#4a2e18');
+  pouch = { img: c, w: W, h: H, ax: Math.floor(W / 2), ay: H };
+  return pouch;
+}
