@@ -91,4 +91,20 @@ describe('кампания', () => {
     expect(lw.all<any>('structure').filter((s) => s.type === 'shop').length).toBeGreaterThanOrEqual(3);
     step(lw, 30);
   });
+
+  it('выбранный облик правителя переживает сохранение', () => {
+    const c = new Campaign(5);
+    const a = c.startReign();
+    const first = c.ruler.key;
+    const r = c.rerollRuler();
+    expect(r.key).not.toBe(first);
+    const m = a.monarchs[0];
+    m.rider = r.look;
+    m.riderKey = r.key;
+    saveCampaign(c, a.world, [m]);
+    const loaded = loadCampaign()!;
+    expect(loaded.campaign.ruler.key).toBe(r.key);
+    expect(loaded.monarchs[0].riderKey).toBe(r.key);
+    expect(loaded.monarchs[0].rider).toEqual(r.look);
+  });
 });

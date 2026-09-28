@@ -55,6 +55,8 @@ export class App {
   private menu!: Menu;
   private sail: { dock: CentralDock; dest: number; t: number; monarch: Monarch } | null = null;
   private chooseIndex = 2;
+  /** Начало правления: пока монарх стоит на месте, «вниз» меняет его облик. */
+  private reroll: { x: number } | null = null;
   settings: Settings = { master: 0.8, music: 0.6, difficulty: 'normal' };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -112,6 +114,7 @@ export class App {
     const coins = this.params.get('coins');
     if (coins) this.monarchs[0].coins = Number(coins);
     this.cameras[0].snap(this.monarchs[0].x);
+    this.reroll = setup ? null : { x: this.monarchs[0].x };
     this.setState('playing');
   }
 
@@ -162,8 +165,17 @@ export class App {
     });
     world.on('crownTaken', (ownerId: number) => this.onCrownTaken(ownerId));
     world.on('crownKnocked', () => this.checkCrowns());
+    world.on('emptyDrop', (m: Monarch) => this.rerollRuler(m));
     world.on('sail', (m: Monarch, dock: CentralDock) => this.openChoose(m, dock));
     world.banner(`ОСТРОВ ${toRoman(world.island.index)}`, undefined, 4);
+  }
+
+  private rerollRuler(m: Monarch): void {
+    if (!this.reroll || m.player !== 0 || !m.hasCrown || this.state !== 'playing') return;
+    const r = this.campaign.rerollRuler();
+    m.rider = r.look;
+    m.riderKey = r.key;
+    this.world.sound('upgrade', m.x, 0.6);
   }
 
   /** Перед горячей перезагрузкой: сохранить партию, если идёт игра. */
@@ -426,6 +438,7 @@ export class App {
         if (this.stateTime > 2 && (p0.pressed('confirm') || p0.pressed('drop') || this.input.taps.length)) {
           const a = this.campaign.heir();
           this.enterWorld(a.world, a.monarchs);
+          this.reroll = { x: a.monarchs[0].x };
           this.setState('playing');
         }
         break;
@@ -465,6 +478,7 @@ export class App {
     w.listenerX = this.cameras[0].x;
     w.listenerW = this.screen.w;
     w.update(dt);
+    if (this.reroll && Math.abs(focus.x - this.reroll.x) > 6) this.reroll = null;
     this.cameras[0].follow(focus, dt, this.screen.w, w.island.left, w.island.right);
     if (this.monarchs[1]) this.cameras[1].follow(this.monarchs[1], dt, this.screen.w, w.island.left, w.island.right);
     this.renderer.setSeason(w.time.season);
@@ -533,6 +547,10 @@ export class App {
       hud: (ctx) => {
         if (showHud) this.hud.draw(ctx, r, w, this.monarchs, focus);
         if (showHud && this.input.touchSeen && this.state === 'playing') this.drawTouchHints(ctx);
+        if (showHud && this.reroll && this.state === 'playing' && focus === this.monarchs[0]) {
+          const hint = this.input.touchSeen ? 'ТАП ПО МОНАРХУ — ДРУГОЙ ПРАВИТЕЛЬ' : 'S ИЛИ ВНИЗ — ДРУГОЙ ПРАВИТЕЛЬ';
+          drawText(ctx, hint, Math.floor(r.w / 2), r.h - (this.input.touchSeen ? 46 : 12), { align: 'center', color: '#f4ecd8', alpha: 0.7 });
+        }
       },
     });
   }

@@ -101,6 +101,15 @@ export class Campaign {
     return { world: w, monarchs: [m], firstVisit: true };
   }
 
+  private rulerRolls = 0;
+
+  /** Другой облик правителя: пока монарх не тронулся с места, «вниз» перебирает претендентов. */
+  rerollRuler(): Ruler {
+    this.rulerRolls++;
+    this.ruler = randomRuler(this.seed + this.reign * 7 + this.rulerRolls * 131);
+    return this.ruler;
+  }
+
   /** Потеря короны: правление переходит к наследнику. */
   heir(): ArrivalInfo {
     this.prevRuler = this.ruler;

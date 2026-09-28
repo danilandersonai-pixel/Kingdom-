@@ -324,6 +324,8 @@ export class Monarch extends Entity {
     }
     this.dropHeld += dt;
     this.refundTimer = 0;
+    // Пустой кошелёк: в начале правления «вниз» перебирает облик правителя.
+    if (c.dropPressed && this.coins <= 0 && this.gems <= 0) w.emit('emptyDrop', this);
     // В Two Crowns начатая оплата продолжается, даже если отъехать от объекта.
     const t = this.payTarget && this.payTarget.price(this) > 0 ? this.payTarget : target;
     if (t) {
