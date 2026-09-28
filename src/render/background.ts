@@ -169,6 +169,10 @@ class Layer {
     return { base, shade, light, h };
   }
 
+  get uncolored(): boolean {
+    return this.lastTone === '';
+  }
+
   recolor(tone: LayerTone, ever: LayerTone): void {
     const key = [tone.base, tone.shade, tone.light, ever.base, ever.shade, ever.light].map((c) => c.map(Math.round).join(',')).join('|');
     if (key === this.lastTone) return;
@@ -263,6 +267,70 @@ interface Meteor {
   life: number;
 }
 
+/** Плавный шум по сетке (значения в узлах, сглаженная интерполяция). */
+function smoothNoise(x: number, y: number, seed: number): number {
+  const x0 = Math.floor(x);
+  const y0 = Math.floor(y);
+  const u = (x - x0) * (x - x0) * (3 - 2 * (x - x0));
+  const v = (y - y0) * (y - y0) * (3 - 2 * (y - y0));
+  const a = hash2(x0, y0 + seed * 131);
+  const b = hash2(x0 + 1, y0 + seed * 131);
+  const c = hash2(x0, y0 + 1 + seed * 131);
+  const d = hash2(x0 + 1, y0 + 1 + seed * 131);
+  return a + (b - a) * u + (c - a) * v + (a - b - c + d) * u * v;
+}
+
+let bloodMoonCache: HTMLCanvasElement | null = null;
+/** Кровавая луна: потемнение к краю, «моря», кратеры с кромкой, светлый ободок. */
+function bloodMoonSprite(): HTMLCanvasElement {
+  if (bloodMoonCache) return bloodMoonCache;
+  const R = 31;
+  const S = R * 2 + 3;
+  const [c, ctx] = makeCanvas(S, S);
+  const img = ctx.createImageData(S, S);
+  const cx = S / 2;
+  const LIGHT = hex('#ff7a52');
+  const MID = hex('#e0402a');
+  const DEEP = hex('#9a1e14');
+  const EDGE = hex('#5a0e0c');
+  const craters: Array<[number, number, number]> = [
+    [-11, -9, 4],
+    [8, 10, 5],
+    [14, -6, 3],
+    [-4, 15, 3],
+    [-18, 6, 2.5],
+    [4, -17, 2.5],
+  ];
+  for (let y = 0; y < S; y++) {
+    for (let x = 0; x < S; x++) {
+      const dx = x + 0.5 - cx;
+      const dy = y + 0.5 - cx;
+      const d = Math.hypot(dx, dy) / R;
+      if (d > 1) continue;
+      // Потемнение к краю диска и лёгкий свет сверху-слева.
+      let t = 0.35 + Math.pow(d, 2.4) * 0.55 - (-dx - dy) / (R * 6);
+      // «Моря» — тёмные пятна плавного шума.
+      const sea = smoothNoise(x / 11, y / 9, 17) * 0.7 + smoothNoise(x / 5, y / 5, 29) * 0.3;
+      if (sea > 0.6) t += 0.22;
+      for (const [kx, ky, kr] of craters) {
+        const cd = Math.hypot(dx - kx, dy - ky) / kr;
+        if (cd < 0.7) t += 0.18;
+        else if (cd < 1 && dy - ky > 0) t -= 0.14; // кромка кратера на свету
+      }
+      t += (hash2(x, y + 911) - 0.5) * 0.08;
+      const col = t < 0.3 ? LIGHT : t < 0.55 ? MID : t < 0.8 ? DEEP : EDGE;
+      const i = (y * S + x) * 4;
+      img.data[i] = col[0];
+      img.data[i + 1] = col[1];
+      img.data[i + 2] = col[2];
+      img.data[i + 3] = 255;
+    }
+  }
+  ctx.putImageData(img, 0, 0);
+  bloodMoonCache = c;
+  return c;
+}
+
 /** Облачные маски: тень, основа, свет, кромка со стороны солнца. */
 const CLOUD_TONES = 4;
 
@@ -277,6 +345,7 @@ export class Background {
   private cloudTone = '';
   private season: Season;
   private recolorTimer = 0;
+  private recolorNext = 0;
   private milky!: HTMLCanvasElement;
   private meteors: Meteor[] = [];
   private aurora: [HTMLCanvasElement, CanvasRenderingContext2D] | null = null;
@@ -538,10 +607,18 @@ export class Background {
     if (a.moonH > -0.05) {
       const mx = Math.round(w * a.moonX);
       const my = Math.round(horizonY - 8 - a.moonH * (horizonY - 40));
-      const r = a.bloodMoon ? 13 : 9;
       const lit = a.bloodMoon ? 1 : (1 - Math.cos(a.moonPhase * Math.PI * 2)) / 2;
-      this.glow(ctx, mx, my, a.bloodMoon ? 70 : 26 + lit * 18, a.moonColor, (a.bloodMoon ? 0.4 : 0.18) * (0.3 + 0.7 * lit));
-      this.moon(ctx, mx, my, r, a);
+      if (a.bloodMoon) {
+        // Кровавая луна — огромный багровый диск низко над лесом.
+        const by = Math.round(horizonY - 30 - a.moonH * (horizonY - 90));
+        this.glow(ctx, mx, by, 170, a.moonColor, 0.42);
+        this.glow(ctx, mx, by, 60, hex('#ff6a4a'), 0.35);
+        const bm = bloodMoonSprite();
+        ctx.drawImage(bm, mx - (bm.width >> 1), by - (bm.height >> 1));
+      } else {
+        this.glow(ctx, mx, my, 26 + lit * 18, a.moonColor, 0.18 * (0.3 + 0.7 * lit));
+        this.moon(ctx, mx, my, 9, a);
+      }
     }
     ctx.globalAlpha = 1;
 
@@ -661,9 +738,13 @@ export class Background {
 
   /** Слои леса с дымкой между ними. */
   drawLayers(ctx: CanvasRenderingContext2D, a: Atmosphere, camX: number, w: number, groundY: number, force = false): void {
-    if (this.recolorTimer <= 0 || force) {
-      for (let i = 0; i < this.layers.length; i++) this.layers[i].recolor(a.layers[i], a.evergreen[i]);
-      this.recolorTimer = 0.2;
+    // Только что построенный слой (старт, смена сезона) красим сразу.
+    for (let i = 0; i < this.layers.length; i++) if (force || this.layers[i].uncolored) this.layers[i].recolor(a.layers[i], a.evergreen[i]);
+    if (this.recolorTimer <= 0) {
+      // По одному слою за раз: перекраска размазана по кадрам, без рывков.
+      const i = this.recolorNext++ % this.layers.length;
+      this.layers[i].recolor(a.layers[i], a.evergreen[i]);
+      this.recolorTimer = 0.2 / this.layers.length;
     }
     for (let i = 0; i < this.layers.length; i++) {
       const tone = a.layers[i];

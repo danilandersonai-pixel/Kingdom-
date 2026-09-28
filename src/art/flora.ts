@@ -77,22 +77,30 @@ export function treePalette(kind: TreeKind, season: Season, variant: number): Tr
   };
 }
 
+// Кэш с вытеснением давно не нужных спрайтов (порядок Map — порядок использования).
+// Раньше кэш очищался целиком при смене сезона в ключе — ягодник («лето»)
+// и деревья («весна») сбрасывали его друг другу каждый кадр.
 const cache = new Map<string, Sprite>();
-let cacheSeason: Season | null = null;
+const CACHE_MAX = 420;
 
-function remember(key: string, s: Sprite, season: Season): void {
-  // Храним спрайты только текущего сезона и не больше пары сотен.
-  if (season !== cacheSeason || cache.size > 360) {
-    cache.clear();
-    cacheSeason = season;
+function cached(key: string): Sprite | undefined {
+  const s = cache.get(key);
+  if (s) {
+    cache.delete(key);
+    cache.set(key, s);
   }
+  return s;
+}
+
+function remember(key: string, s: Sprite): void {
   cache.set(key, s);
+  while (cache.size > CACHE_MAX) cache.delete(cache.keys().next().value as string);
 }
 
 /** Спрайт дерева игрового слоя (кэшируется по породе, варианту, высоте и сезону). */
 export function treeSprite(kind: TreeKind, variant: number, height: number, season: Season): Sprite {
   const key = `${kind}:${variant}:${height}:${season}`;
-  let s = cache.get(key);
+  let s = cached(key);
   if (s) return s;
   const rng = new Rng(variant * 7919 + height * 31 + kind.length * 101);
   const winter = season === 'winter';
@@ -102,18 +110,18 @@ export function treeSprite(kind: TreeKind, variant: number, height: number, seas
   if (season === 'spring' && (kind === 'oak' || kind === 'maple') && variant % 3 === 0) addBlossom(m, new Rng(variant + height), 0.05);
   const img = paintTree(m, treePalette(kind, season, variant));
   s = { img, w: m.w, h: m.h, ax: m.ax, ay: m.h };
-  remember(key, s, season);
+  remember(key, s);
   return s;
 }
 
 /** Куст (для ягодника и декора). */
 export function bushSprite(seed: number, width: number, height: number, season: Season): Sprite {
   const key = `bush:${seed}:${width}:${height}:${season}`;
-  let s = cache.get(key);
+  let s = cached(key);
   if (s) return s;
   const m = makeBush(new Rng(seed), width, height, season === 'winter');
   const img = paintTree(m, { bark: BARK.oak, leaf: season === 'winter' ? PINE_WINTER : leavesFor('bush', season, seed), snow: SNOW });
   s = { img, w: m.w, h: m.h, ax: m.ax, ay: m.h };
-  remember(key, s, season);
+  remember(key, s);
   return s;
 }

@@ -336,24 +336,66 @@ export function millSprite(): Sprite {
 }
 
 // ——— Лагерь бродяг ———
+/** Латаный шатёр на растяжках, флажок-тряпка, скатка, мешок, бревно
+ *  у кострища и котелок на треноге. Огонь рисуется отдельно (светится). */
 export function campSprite(): Sprite {
-  return build('camp', 32, 18, (ctx, w, h) => {
-    // Латаная палатка из светлой ткани.
-    poly(ctx, [[1, h], [19, h], [10, h - 15]], '#a8987a');
-    poly(ctx, [[10, h - 15], [19, h], [14, h]], '#7a6a54');
-    line(ctx, 10, h - 15, 10, h - 17, WOOD);
-    line(ctx, 10, h - 15, 1, h - 1, '#c8b898');
-    rect(ctx, 9, h - 6, 3, 6, '#2a2018');
-    rect(ctx, 4, h - 6, 3, 3, '#8a6a4a');
-    rect(ctx, 13, h - 9, 2, 3, '#6a7a6a');
-    rect(ctx, 15, h - 4, 2, 2, '#9a5a4a');
-    // Котелок на палке и кострище.
-    line(ctx, 22, h - 1, 28, h - 2, WOOD_D);
-    line(ctx, 22, h - 2, 28, h - 1, WOOD);
-    px(ctx, 21, h - 1, '#7a7a80');
-    px(ctx, 29, h - 1, '#7a7a80');
-    line(ctx, 21, h - 9, 29, h - 9, WOOD_D);
-    rect(ctx, 24, h - 8, 3, 2, '#3a3a40');
+  return build('camp2', 46, 28, (ctx, w, h) => {
+    const G = h - 1;
+    // Растяжки к колышкам.
+    line(ctx, 13, 4, 0, G, '#a89878');
+    line(ctx, 13, 4, 26, G, '#a89878');
+    px(ctx, 0, G, WOOD_D);
+    px(ctx, 26, G, WOOD_D);
+    // Полотно: левый скат на свету, правый — в тени.
+    poly(ctx, [[2, G + 1], [13, 3], [13, G + 1]], '#c4b490');
+    poly(ctx, [[13, 3], [24, G + 1], [13, G + 1]], '#9a8a6a');
+    line(ctx, 13, 3, 2, G, '#e0d2b0');
+    line(ctx, 13, 3, 24, G, '#7a6a50');
+    // Складки ткани.
+    line(ctx, 8, 12, 6, G, '#b0a080');
+    line(ctx, 18, 12, 20, G, '#8a7a5c');
+    // Заплатки со стежками.
+    for (const [x, y, ww, hh, c] of [[5, 16, 4, 4, '#8a6a4a'], [16, 11, 3, 4, '#6a7a6a'], [18, 19, 4, 3, '#9a5a4a']] as Array<[number, number, number, number, string]>) {
+      rect(ctx, x, y, ww, hh, c);
+      for (let k = 0; k < ww; k += 2) {
+        px(ctx, x + k, y - 1, '#ece0c4');
+        px(ctx, x + k, y + hh, '#ece0c4');
+      }
+    }
+    // Вход: тёмный треугольник, откинутый полог.
+    poly(ctx, [[10, G + 1], [13, G - 10], [16, G + 1]], '#2a2018');
+    poly(ctx, [[13, G - 10], [16, G + 1], [18, G + 1]], '#d4c6a2');
+    // Конёк: шест торчит над палаткой.
+    rect(ctx, 12, 1, 2, 3, WOOD_D);
+    px(ctx, 12, 1, WOOD_L);
+    // Флажок-тряпка на палке.
+    line(ctx, 27, G, 27, G - 19, WOOD_D);
+    poly(ctx, [[28, G - 19], [34, G - 17], [28, G - 14]], '#a84a3a');
+    px(ctx, 28, G - 19, '#c86a5a');
+    // Скатка и мешок у входа.
+    rect(ctx, 1, G - 2, 6, 3, '#6a4a6a');
+    px(ctx, 1, G - 2, '#8a6a8a');
+    rect(ctx, 3, G - 2, 1, 3, '#4a3448');
+    rect(ctx, 20, G - 4, 4, 5, '#a08858');
+    rect(ctx, 21, G - 5, 2, 1, '#c8b080');
+    px(ctx, 20, G - 4, '#b89a68');
+    // Кострище: камни по кругу.
+    for (const x of [27, 29, 31, 33, 35, 37]) {
+      rect(ctx, x, G - 1, 2, 2, x % 4 === 1 ? '#6a6a70' : '#7c7c84');
+      px(ctx, x, G - 1, '#9a9aa2');
+    }
+    // Тренога и котелок.
+    line(ctx, 28, G - 1, 32, G - 14, WOOD_D);
+    line(ctx, 36, G - 1, 32, G - 14, WOOD);
+    line(ctx, 32, G - 13, 32, G - 11, '#5a5a60');
+    ellipse(ctx, 32, G - 8, 3, 2.5, '#2a2a30');
+    rect(ctx, 29, G - 11, 7, 1, '#3a3a42');
+    px(ctx, 30, G - 9, '#5a5a66');
+    // Бревно-скамья.
+    rect(ctx, 38, G - 3, 8, 3, WOOD);
+    rect(ctx, 38, G - 3, 8, 1, WOOD_L);
+    ellipse(ctx, 44.5, G - 1.5, 1.5, 1.5, '#b08858');
+    px(ctx, 44, G - 2, '#8a6440');
     void w;
   });
 }
@@ -481,14 +523,93 @@ export function statueSprite(kind: StatueKind, active: boolean): Sprite {
 }
 
 // ——— Хижина отшельника ———
+/** Бревенчатый сруб с торцами брёвен, соломенная крыша с мхом, каменная
+ *  труба, светящееся окошко, дверь с петлями, поленница и грибы. */
+export const HUT_CHIMNEY: [number, number] = [31, 38];
 export function hutSprite(): Sprite {
-  return build('hut', 24, 22, (ctx, w, h) => {
-    rect(ctx, 3, h - 11, w - 6, 11, '#8a7a5a');
-    for (let x = 4; x < w - 3; x += 3) rect(ctx, x, h - 11, 1, 11, '#6a5a42');
-    poly(ctx, [[0, h - 10], [w, h - 10], [w - 6, h - 20], [6, h - 20]], '#6a7a4a');
-    rect(ctx, w - 8, h - 22, 3, 5, STONE_D);
-    rect(ctx, w / 2 - 2, h - 7, 4, 7, '#2a1a12');
-    rect(ctx, 6, h - 8, 3, 3, '#e8c060');
+  return build('hut2', 42, 40, (ctx, w, h) => {
+    const G = h - 1;
+    // Каменный цоколь.
+    for (let x = 4; x < 38; x += 3) {
+      rect(ctx, x, G - 1, 3, 2, x % 2 ? '#6e6e76' : '#7e7e86');
+      px(ctx, x, G - 1, '#9a9aa2');
+    }
+    // Стены из брёвен: светлая кромка сверху, тень снизу.
+    for (let k = 0; k < 6; k++) {
+      const y = G - 4 - k * 3;
+      rect(ctx, 5, y, 32, 3, '#7a5436');
+      rect(ctx, 5, y, 32, 1, '#a07a50');
+      rect(ctx, 5, y + 2, 32, 1, '#553823');
+      // Торцы брёвен на углах — через ряд то слева, то справа.
+      const ex = k % 2 ? 3 : 36;
+      ellipse(ctx, ex + 1.5, y + 1.5, 1.8, 1.6, '#b08858');
+      px(ctx, ex + 1, y + 1, '#8a6440');
+    }
+    // Дверь со скруглённым верхом, петли, ручка.
+    rect(ctx, 16, G - 13, 7, 13, '#4a3020');
+    rect(ctx, 17, G - 14, 5, 1, '#4a3020');
+    for (const x of [18, 20]) line(ctx, x, G - 13, x, G - 1, '#3a2418');
+    rect(ctx, 16, G - 10, 2, 1, '#8a8a90');
+    rect(ctx, 16, G - 4, 2, 1, '#8a8a90');
+    px(ctx, 21, G - 6, '#d8b060');
+    // Окошко с тёплым светом и ставнями.
+    rect(ctx, 27, G - 13, 6, 5, '#f0c060');
+    rect(ctx, 27, G - 13, 6, 1, '#fff0a8');
+    line(ctx, 30, G - 13, 30, G - 9, '#553823');
+    line(ctx, 27, G - 11, 32, G - 11, '#553823');
+    rect(ctx, 25, G - 13, 2, 5, '#6a4a2e');
+    rect(ctx, 33, G - 13, 2, 5, '#6a4a2e');
+    rect(ctx, 26, G - 8, 8, 1, '#553823');
+    // Соломенная крыша: треугольный фронтон с широкими свесами.
+    const top = G - 36;
+    poly(ctx, [[-1, G - 18], [21, top], [43, G - 18]], '#a88a4c');
+    for (let y = top + 2; y < G - 18; y += 2) {
+      const t = (y - top) / (G - 18 - top);
+      const half = Math.round(t * 22);
+      for (let x = 21 - half; x <= 21 + half; x++) {
+        const n = hash2(x, y * 3);
+        const c = x < 21 ? (n > 0.6 ? '#c8a860' : '#b09050') : n > 0.6 ? '#98783e' : '#886a34';
+        px(ctx, x, y, c);
+        if (n > 0.9) px(ctx, x, y + 1, '#6a5028');
+      }
+    }
+    line(ctx, 21, top, -1, G - 18, '#d8bc70');
+    line(ctx, 21, top, 43, G - 18, '#6a5028');
+    // Свес крыши — тёмная кромка и тень на стене.
+    rect(ctx, 0, G - 18, 42, 1, '#6a5028');
+    rect(ctx, 5, G - 17, 32, 1, '#3a2616');
+    // Мох пятнами на соломе.
+    for (let k = 0; k < 36; k++) {
+      const x = Math.floor(hash2(k, 5) * 36) + 3;
+      const y = G - 19 - Math.floor(hash2(k, 6) * 12);
+      const t = (y - top) / (G - 18 - top);
+      if (Math.abs(x - 21) > t * 21 - 1) continue;
+      px(ctx, x, y, hash2(k, 7) > 0.5 ? '#5a7a3a' : '#44602e');
+      if (hash2(k, 8) > 0.6) px(ctx, x + 1, y, '#44602e');
+    }
+    // Каменная труба справа.
+    for (let y = G - 38; y < G - 24; y++) {
+      for (let x = 29; x < 34; x++) px(ctx, x, y, (x + (y >> 1) * 2) % 4 === 0 ? '#5e5e66' : x === 29 ? '#9a9aa2' : '#7e7e86');
+    }
+    rect(ctx, 28, G - 39, 7, 2, '#6e6e76');
+    rect(ctx, 28, G - 39, 7, 1, '#9a9aa2');
+    // Пучок трав под свесом и поленница слева.
+    line(ctx, 11, G - 17, 11, G - 13, '#6a8a44');
+    line(ctx, 12, G - 17, 12, G - 12, '#8a9a54');
+    px(ctx, 10, G - 13, '#a86a8a');
+    for (let k = 0; k < 6; k++) {
+      const x = 0 + (k % 3) * 2;
+      const y = G - 2 - Math.floor(k / 3) * 2;
+      ellipse(ctx, x + 1, y + 0.5, 1.2, 1.2, '#b08858');
+      px(ctx, x + 1, y, '#8a6440');
+    }
+    // Грибы у цоколя.
+    for (const [x, c] of [[37, '#c84a3a'], [39, '#d8a060']] as Array<[number, string]>) {
+      px(ctx, x, G, '#e8e0cc');
+      rect(ctx, x - 1, G - 1, 3, 1, c);
+      px(ctx, x, G - 1, '#f4f0e8');
+    }
+    void w;
   });
 }
 

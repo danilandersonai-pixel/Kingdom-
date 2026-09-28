@@ -5,7 +5,7 @@
 import { Entity } from '../entity';
 import type { Renderer } from '../../render/renderer';
 import { groundShadow } from '../../render/shadow';
-import { blit } from '../../engine/sprite';
+import { blit, flipOf, rimOf, type Sprite } from '../../engine/sprite';
 import { greedFrames, maskSprite, GREED_SIZE, type GreedKind, type GreedAnim } from '../../art/greed';
 import { GREED, M } from '../config';
 import { Coin, DroppedTool, DroppedCrown } from './pickups';
@@ -511,6 +511,7 @@ export class Greed extends Entity {
     const sw = this.kind === 'breeder' ? 22 : this.kind === 'floater' ? 12 : 7;
     groundShadow(ctx, sx, r.sy(0), sw, this.kind === 'floater' || this.y + jy > 6 ? 0.12 : 0.26);
     blit(ctx, f, sx, sy, this.facing < 0);
+    this.drawn = { f: this.facing < 0 ? flipOf(f) : f, sx, sy };
     if (this.masked && this.maxHp >= 3) {
       // Узорная маска у прочных гридлингов.
       const m = maskSprite(this.variant + 1);
@@ -531,10 +532,20 @@ export class Greed extends Entity {
     }
   }
 
+  /** Последний нарисованный кадр — для кромки лунного света поверх темноты. */
+  private drawn: { f: Sprite; sx: number; sy: number } | null = null;
+
   override drawEmissive(ctx: CanvasRenderingContext2D, r: Renderer): void {
     // Глаза в темноте — чтобы Жадность было видно ночью.
     const night = this.world.time.isNight || this.world.time.phase > 0.62;
     if (!night) return;
+    // Кромка лунного света по силуэту: в Кровавую луну — багровая.
+    if (this.drawn) {
+      const blood = this.world.time.isBloodMoon;
+      ctx.globalAlpha = blood ? 0.7 : 0.45;
+      blit(ctx, rimOf(this.drawn.f, blood ? '#ff5236' : '#8e9cd0'), this.drawn.sx, this.drawn.sy);
+      ctx.globalAlpha = 1;
+    }
     const sx = r.sx(this.x) + this.facing * (this.kind === 'breeder' ? 4 : 2);
     const h = this.kind === 'breeder' ? 22 : this.kind === 'floater' ? 0 : 6;
     const sy = r.sy(this.y + h);

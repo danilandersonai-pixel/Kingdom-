@@ -25,6 +25,8 @@ export interface TreeMasks {
   mat: Uint8Array;
   /** Тон 0..4: глубокая тень, тень, основной, свет, блик. */
   tone: Uint8Array;
+  /** Глубокие «окна» в кроне: там сквозь тень листвы видны ветви. */
+  hollow?: Uint8Array;
 }
 
 // Свет сверху-слева и немного спереди.
@@ -338,18 +340,25 @@ function crown(m: TreeMasks, clumps: Clump[], o: CrownOpts): void {
       let inside = true;
       for (let yy = -5; yy <= 5 && inside; yy++) for (let xx = -5; xx <= 5; xx++) if (x + xx < 0 || x + xx >= w || y + yy < 0 || y + yy >= h || owner[(y + yy) * w + x + xx] < 0) inside = false;
       if (!inside) continue;
-      const r = 2 + hash(x, y, o.seed) * 1.2;
-      for (let yy = -3; yy <= 3; yy++) {
-        for (let xx = -3; xx <= 3; xx++) {
-          if (xx * xx + yy * yy > r * r) continue;
+      // Не дыра насквозь (на экране это «битые пиксели» цвета неба), а глубина
+      // кроны: тёмная листва внутри, светлая кромка снизу-справа, где свет
+      // проходит сквозь окно; в глубине видны ветви.
+      const r = 2.2 + hash(x, y, o.seed) * 1.3;
+      if (!m.hollow) m.hollow = new Uint8Array(w * h);
+      for (let yy = -4; yy <= 4; yy++) {
+        for (let xx = -4; xx <= 4; xx++) {
+          const d2 = xx * xx + (yy * yy) / 0.8;
+          if (d2 > r * r) continue;
           const j = (y + yy) * w + x + xx;
-          m.mat[j] = 0;
-          m.tone[j] = 0;
+          if (m.mat[j] !== LEAF) continue;
+          const rim = d2 > (r - 1) * (r - 1) && (xx > 0 || yy > 0);
+          m.tone[j] = rim ? 1 : 0;
+          if (!rim) m.hollow[j] = 1;
         }
       }
-      // Под «окном» — тень.
+      // Верхний край окна — тень от нависшей листвы.
       for (let xx = -1; xx <= 1; xx++) {
-        const j = (y + Math.ceil(r) + 1) * w + x + xx;
+        const j = (y - Math.ceil(r) - 1) * w + x + xx;
         if (m.mat[j] === LEAF) m.tone[j] = Math.max(0, m.tone[j] - 1);
       }
       break;
@@ -360,9 +369,10 @@ function crown(m: TreeMasks, clumps: Clump[], o: CrownOpts): void {
 /** Вернуть кору под листвой там, где листву вырезали (ветви видны в «окнах»). */
 function overlayCrown(m: TreeMasks, bark: TreeMasks): void {
   for (let i = 0; i < m.w * m.h; i++) {
-    if (m.mat[i] === 0 && bark.mat[i] === BARK) {
+    if ((m.mat[i] === 0 || m.hollow?.[i]) && bark.mat[i] === BARK) {
       m.mat[i] = BARK;
-      m.tone[i] = Math.max(0, bark.tone[i] - 1);
+      // В глубине кроны ветви в тени.
+      m.tone[i] = Math.max(0, bark.tone[i] - (m.hollow?.[i] ? 2 : 1));
     }
   }
 }

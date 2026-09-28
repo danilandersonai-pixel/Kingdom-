@@ -133,6 +133,44 @@ function snowOf(s: Sprite): Sprite {
   return o;
 }
 
+// ——— Кромка лунного света: верхние и правые края силуэта ———
+const rimCache = new Map<string, WeakMap<Sprite, Sprite>>();
+
+/** Контур силуэта со стороны луны (сверху и справа) одним цветом —
+ *  ночью тёмные фигуры отделяются от тёмного фона. */
+export function rimOf(s: Sprite, color: string): Sprite {
+  let m = rimCache.get(color);
+  if (!m) {
+    m = new WeakMap();
+    rimCache.set(color, m);
+  }
+  let o = m.get(s);
+  if (o) return o;
+  const w = s.img.width;
+  const h = s.img.height;
+  const [c, ctx] = makeCanvas(w, h);
+  ctx.drawImage(s.img, 0, 0);
+  const d = ctx.getImageData(0, 0, w, h).data;
+  const A = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : d[(y * w + x) * 4 + 3]);
+  const out = ctx.createImageData(w, h);
+  const [r, g, b] = hex(color);
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (A(x, y) < 128 || (A(x, y - 1) >= 128 && A(x + 1, y) >= 128)) continue;
+      const i = (y * w + x) * 4;
+      out.data[i] = r;
+      out.data[i + 1] = g;
+      out.data[i + 2] = b;
+      out.data[i + 3] = 255;
+    }
+  }
+  ctx.clearRect(0, 0, w, h);
+  ctx.putImageData(out, 0, 0);
+  o = { img: c, w: s.w, h: s.h, ax: s.ax, ay: s.ay };
+  m.set(s, o);
+  return o;
+}
+
 /** Рисует спрайт так, чтобы точка привязки попала в (x, y). */
 export function blit(ctx: CanvasRenderingContext2D, s: Sprite, x: number, y: number, flip = false, alpha = 1): void {
   let sp = flip ? flipOf(s) : s;

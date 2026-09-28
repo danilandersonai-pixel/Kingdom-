@@ -6,7 +6,8 @@ import { Structure, type Currency } from './structure';
 import type { Monarch } from '../entities/monarch';
 import type { Renderer } from '../../render/renderer';
 import { blit } from '../../engine/sprite';
-import { hutSprite, ballistaSprite, bakerySprite, hornSprite } from '../../art/buildings';
+import { hutSprite, ballistaSprite, bakerySprite, hornSprite, HUT_CHIMNEY } from '../../art/buildings';
+import { fxRng } from '../../engine/rng';
 import { humanFrames } from '../../art/humans';
 import { PRICES, M, SIEGE, TOWER_TIERS } from '../config';
 import { townX } from '../kingdom';
@@ -27,6 +28,13 @@ export const HERMITS: Record<HermitKind, { gems: number; island: number; name: s
   knight: { gems: 2, island: 4, name: 'Отшельник рыцарей', desc: 'Строит башню рыцарей' },
   horn: { gems: 3, island: 5, name: 'Отшельник рога', desc: 'Вешает рог на каменную стену' },
 };
+
+/** Дымок из трубы лесной хижины. */
+export function chimneySmoke(w: World, x: number, dt: number): void {
+  if (!fxRng.chance(dt * 1.6)) return;
+  const [cx, cy] = HUT_CHIMNEY;
+  w.fx.particles.spawn({ x: x - 21 + cx + fxRng.range(-1, 1), y: cy, vx: fxRng.range(-2, 2) + 2, vy: fxRng.range(5, 9), life: 3.2, max: 3.2, color: 'rgba(170,165,160,0.4)', size: 2, drag: 0.2, wobble: 5 });
+}
 
 export class HermitHut extends Structure {
   readonly type = 'hermitHut' as const;
@@ -62,9 +70,11 @@ export class HermitHut extends Structure {
     this.world.add(new Hermit(this.x + 10, this.kind));
     this.world.banner(HERMITS[this.kind].name.toUpperCase(), HERMITS[this.kind].desc);
   }
-  override update(): void {
+  override update(dt: number): void {
     // Разблокированный самоцветами отшельник выходит сам (у наследника тоже).
     if (!this.released && this.world.meta.gemUnlocks.has(this.key)) this.release();
+    // Пока отшельник дома — из трубы вьётся дымок.
+    if (!this.released) chimneySmoke(this.world, this.x, dt);
   }
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     blit(ctx, hutSprite(), r.sx(this.x), r.sy(0));

@@ -35,10 +35,26 @@ export function drawWater(
     const amp1 = Math.min(2.4, 0.35 + r * 0.045) * calm;
     const amp2 = Math.min(1.6, r * 0.025) * calm;
     const off = Math.round(Math.sin(r * 0.9 + time * 2.4) * amp1 + Math.sin(r * 0.23 - time * 1.1 + 1.3) * amp2);
-    // Иногда строка «выпадает» — даёт характерные штрихи на воде.
-    const streak = hash2(r, Math.floor(time * 3 * calm)) < (0.06 + depth * 0.08) * calm;
-    if (streak) continue;
-    ctx.drawImage(scene, 0, srcY, w, 1, off, waterTop + r, w, 1);
+    // Иногда строка рвётся на куски с разным сдвигом и бликом —
+    // характерные короткие штрихи на воде, а не линия во всю ширину.
+    const frame = Math.floor(time * 3 * calm);
+    const streak = hash2(r, frame) < (0.06 + depth * 0.08) * calm;
+    if (!streak) {
+      ctx.drawImage(scene, 0, srcY, w, 1, off, waterTop + r, w, 1);
+      continue;
+    }
+    let x0 = 0;
+    for (let k = 0; x0 < w; k++) {
+      const len = 18 + Math.floor(hash2(r * 7 + k, frame + 11) * 70);
+      const shift = off + Math.round((hash2(r + k * 13, frame + 5) - 0.5) * (4 + depth * 6));
+      const x1 = Math.min(w, x0 + len);
+      ctx.drawImage(scene, Math.max(0, x0 - shift), srcY, x1 - x0, 1, x0, waterTop + r, x1 - x0, 1);
+      x0 = x1;
+    }
+    const gx = Math.floor(hash2(r, frame + 21) * w);
+    const glen = 6 + Math.floor(hash2(r, frame + 22) * 26);
+    ctx.fillStyle = rgb(mix(a.skyHorizon, hex('#ffffff'), 0.4), 0.16 * calm);
+    ctx.fillRect(gx, waterTop + r, glen, 1);
   }
 
   // Затемнение в глубину.

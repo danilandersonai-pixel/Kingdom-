@@ -68,7 +68,8 @@ export class Hud {
     const rows = Math.ceil(price / perRow);
     const gem = t.currency() === 'gem';
     const sx = r.sx(t.x);
-    const baseY = r.sy(t.slotY());
+    // Не ниже макушки всадника с короной — слоты не налезают на монарха.
+    const baseY = r.sy(Math.max(t.slotY(), 38));
     const paying = m.payTarget === t;
     for (let i = 0; i < price; i++) {
       const row = Math.floor(i / perRow);

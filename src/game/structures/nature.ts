@@ -183,7 +183,7 @@ export class Camp extends Structure {
   }
 
   get drawRadius(): number {
-    return 20;
+    return 26;
   }
 
   /** Есть ли деревья с обеих сторон в пределах 12 м. */

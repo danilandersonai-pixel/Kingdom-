@@ -160,7 +160,14 @@ export function portalSprite(t: number, broken: boolean, big: boolean): Sprite {
       const saw2 = Math.abs(((a / (Math.PI * 2)) * (teeth + 2) + ph * 1.3) % 1 - 0.5) * 2;
       const inn = 0.66 - 0.09 * (1 - saw2) * (1 - saw2);
       const i = y * W + x;
-      if (broken) continue;
+      if (broken) {
+        // От арки остались две обломанные опоры: левая выше, правая ниже,
+        // излом рваный.
+        const left = x < cx;
+        const cut = (left ? cy - RH * 0.12 : cy + RH * 0.14) + (h32(x >> 1, 5, seed) - 0.5) * (big ? 7 : 5);
+        if (r < outer && r > inn && y < H - 1 && y > cut) mask[i] = 1;
+        continue;
+      }
       if (r < outer && r > inn && y < H - 1) mask[i] = 1;
       else if (r <= inn) inner[i] = 1;
     }
@@ -192,12 +199,20 @@ export function portalSprite(t: number, broken: boolean, big: boolean): Sprite {
       const mound = Math.sin(Math.PI * t2) * (big ? 11 : 8) + (h32(x >> 2, 3, seed) - 0.5) * 4;
       for (let y = Math.max(0, Math.floor(H - mound)); y < H - 1; y++) mask[y * W + x] = 1;
     }
-    for (let k = 0; k < 3; k++) {
-      const x0 = Math.round(cx + (k - 1) * RW * 0.32 + rng.range(-2, 2));
-      const hh = rng.int(big ? 14 : 10, big ? 26 : 18);
-      for (let y = 0; y < hh; y++) {
-        const half = Math.max(1, Math.round((1 - y / hh) * 3));
-        for (let xx = x0 - half; xx <= x0 + half; xx++) if (xx >= 0 && xx < W) mask[(H - 2 - y) * W + xx] = 1;
+    // Упавшие глыбы свода у подножия.
+    for (let k = 0; k < (big ? 5 : 4); k++) {
+      const bx = cx + (k - (big ? 2 : 1.5)) * RW * 0.26 + rng.range(-3, 3);
+      const rx = rng.range(big ? 3.5 : 2.5, big ? 6 : 4.5);
+      const ry = rx * rng.range(0.55, 0.8);
+      const by = H - 2 - ry + 1;
+      for (let y = Math.floor(by - ry); y <= Math.ceil(by + ry); y++) {
+        for (let x = Math.floor(bx - rx); x <= Math.ceil(bx + rx); x++) {
+          if (x < 0 || y < 0 || x >= W || y >= H - 1) continue;
+          const dx = (x + 0.5 - bx) / rx;
+          const dy = (y + 0.5 - by) / ry;
+          // Угловатые обломки: ромбовидная норма вместо круга.
+          if (Math.abs(dx) * 0.6 + dx * dx * 0.4 + dy * dy <= 1) mask[y * W + x] = 1;
+        }
       }
     }
   }
@@ -241,6 +256,17 @@ export function portalSprite(t: number, broken: boolean, big: boolean): Sprite {
     }
   }
   ctx.putImageData(img, 0, 0);
+  // На руинах уже растёт мох и трава.
+  if (broken) {
+    for (let y = 1; y < H - 1; y++) {
+      for (let x = 0; x < W; x++) {
+        if (!mask[y * W + x] || mask[(y - 1) * W + x] || h32(x, y, seed + 5) < 0.35) continue;
+        ctx.fillStyle = h32(x, y, seed + 6) > 0.5 ? '#4e6e36' : '#3a5a2c';
+        ctx.fillRect(x, y, 1, 1);
+        if (h32(x, y, seed + 7) > 0.8) ctx.fillRect(x, y - 1, 1, 1);
+      }
+    }
+  }
   // Корни-щупальца по земле и светящиеся кристаллы в камне.
   const roots = broken ? 2 : 4;
   for (let k = 0; k < roots; k++) {

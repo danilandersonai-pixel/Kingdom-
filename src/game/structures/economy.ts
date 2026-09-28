@@ -9,6 +9,7 @@ import { blit, makeCanvas, type Sprite } from '../../engine/sprite';
 import { humanFrames } from '../../art/humans';
 import { mountFrames } from '../../art/horse';
 import { hutSprite } from '../../art/buildings';
+import { chimneySmoke } from './hermits';
 import { PRICES, M, TITHE, PURSE } from '../config';
 import { Coin } from '../entities/pickups';
 import { townX } from '../kingdom';
@@ -27,7 +28,10 @@ export class MerchantHut extends Structure {
     this.z = 5;
   }
   get drawRadius(): number {
-    return 16;
+    return 24;
+  }
+  override update(dt: number): void {
+    chimneySmoke(this.world, this.x, dt);
   }
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     blit(ctx, hutSprite(), r.sx(this.x), r.sy(0));
