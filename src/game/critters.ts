@@ -33,7 +33,8 @@ export class Critter extends Entity {
   state: CritterAnim | HumanAnim = 'idle';
   private timer = fxRng.range(0.5, 3);
   private target: number;
-  private fleeing = 0;
+  /** Сколько ещё секунд убегает/улетает (0 — спокоен). */
+  fleeing = 0;
   /** Уходит насовсем (вечер, испуг, далеко от камеры). */
   leaving = false;
 
@@ -272,6 +273,8 @@ export function installCritters(w: World): void {
         for (const off of [-150, 60, 190]) {
           const x = Math.round((cam + off) / 60) * 60;
           const i = t2.cell(x);
+          // Над пляжем и морем бабочек нет.
+          if (Math.abs(x) > w.island.right - 12 * M) continue;
           if (t2.grass[i] > 0.5 && !t2.forest[i]) wants.push({ anchor: `bf${x}`, kind: 'butterfly', count: 2, home: x, range: 2 * M });
         }
       }
@@ -303,8 +306,12 @@ export function installCritters(w: World): void {
         if (wanted.has(c.anchor) || c.leaving) continue;
         switch (c.kind) {
           case 'crow':
-          case 'butterfly':
             if (!near(c.x)) c.dead = true;
+            break;
+          case 'butterfly':
+            // В дождь бабочки прячутся — отпархивают и исчезают.
+            if (w.weatherWet && !c.fleeing) c.startFlee(fxRng.chance(0.5) ? 1 : -1);
+            else if (!near(c.x)) c.dead = true;
             break;
           case 'owl':
             if (!night) c.startFlee(1);

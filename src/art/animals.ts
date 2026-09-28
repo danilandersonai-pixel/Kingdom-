@@ -88,8 +88,9 @@ function dog(ctx: CanvasRenderingContext2D, anim: AnimalAnim, t: number): void {
 function bird(ctx: CanvasRenderingContext2D, _anim: AnimalAnim, t: number): void {
   const s = Math.sin(t * Math.PI * 2);
   const c = '#2a2630';
-  const mid = Math.round(3 + s * 1.2);
-  const tip = Math.round(3 + s * 2.4);
+  // Крылья всегда чуть изогнуты: даже на взмахе вровень — мелкая «v», не тире.
+  const mid = Math.round(2.6 + s * 1.2);
+  const tip = Math.round(2 + s * 2.2);
   px(ctx, 3, 3, c);
   line(ctx, 2, 3, 1, mid, c);
   line(ctx, 1, mid, 0, tip, c);

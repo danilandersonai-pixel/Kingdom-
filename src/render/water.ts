@@ -28,13 +28,18 @@ export function drawWater(
   ctx.fillRect(0, waterTop, w, waterH);
 
   // Зимой река замерзает: отражение почти не рябит; в ненастье — дрожит сильнее.
-  const calm = (1 - frozen * 0.85) * (1 + (1 - a.clear) * 0.7);
+  const calm = (1 - frozen * 0.85) * (1 + (1 - a.clear) * 1.2);
   for (let r = 0; r < waterH; r++) {
     const srcY = Math.max(0, waterTop - 1 - Math.floor(r * 1.02));
     const depth = r / waterH;
-    const amp1 = Math.min(2.4, 0.35 + r * 0.045) * calm;
-    const amp2 = Math.min(1.6, r * 0.025) * calm;
-    const off = Math.round(Math.sin(r * 0.9 + time * 2.4) * amp1 + Math.sin(r * 0.23 - time * 1.1 + 1.3) * amp2);
+    // Длинная пологая волна плюс слабая мелкая дрожь: вертикальные линии
+    // (флагштоки, вывески) изгибаются плавно, а не ломаются в зигзаг.
+    const amp1 = Math.min(1.8, 0.4 + r * 0.03) * calm;
+    const amp2 = Math.min(1.2, r * 0.018) * calm;
+    const amp3 = Math.min(0.6, r * 0.01) * calm;
+    const off = Math.round(
+      Math.sin(r * 0.42 + time * 1.9) * amp1 + Math.sin(r * 0.15 - time * 0.8 + 1.3) * amp2 + Math.sin(r * 1.3 - time * 3.1) * amp3,
+    );
     // Иногда строка рвётся на куски с разным сдвигом и бликом —
     // характерные короткие штрихи на воде, а не линия во всю ширину.
     const frame = Math.floor(time * 3 * calm);
@@ -159,9 +164,17 @@ export function drawWater(
     if (sx < -20 || sx > w + 20) continue;
     const t = 1 - rp.life;
     const rad = 1 + t * rp.r;
-    ctx.fillStyle = rgb(glint, 0.35 * rp.life);
+    ctx.fillStyle = rgb(glint, 0.45 * rp.life);
     const y = waterTop + 2 + Math.floor(hash2(Math.floor(rp.x), 1) * Math.min(20, waterH - 4));
-    ctx.fillRect(Math.round(sx - rad), y, Math.max(1, Math.round(rad * 2)), 1);
+    // Круг сбоку — сплюснутое кольцо: верхняя дуга, концы и слабая нижняя.
+    const rw = Math.max(1, Math.round(rad * 2));
+    ctx.fillRect(Math.round(sx - rad) + 1, y, Math.max(1, rw - 2), 1);
+    if (rad > 1.5) {
+      ctx.fillRect(Math.round(sx - rad), y + 1, 1, 1);
+      ctx.fillRect(Math.round(sx + rad) - 1, y + 1, 1, 1);
+      ctx.fillStyle = rgb(glint, 0.2 * rp.life);
+      ctx.fillRect(Math.round(sx - rad) + 1, y + 2, Math.max(1, rw - 2), 1);
+    }
   }
 }
 

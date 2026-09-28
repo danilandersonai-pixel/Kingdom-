@@ -156,12 +156,18 @@ export class TownCenter extends Structure {
         ctx.fillRect(ox + x, oy + y + h - 1, w, 1);
       });
       ctx.globalAlpha = 1;
+      // Факелы над воротами: кованый держатель, чаша и живой язычок пламени —
+      // выше коня, чтобы не казалось, будто светятся его бока.
       for (const [x, y] of d.torches) {
         const f = Math.sin(this.fireT * 17 + x) > 0 ? 1 : 0;
-        ctx.fillStyle = '#5a3a22';
-        ctx.fillRect(ox + x, oy + y, 1, 3);
+        const tall = Math.sin(this.fireT * 11 + x * 3) > -0.2 ? 1 : 0;
+        ctx.fillStyle = '#2a2a30';
+        ctx.fillRect(ox + x, oy + y, 1, 4);
+        ctx.fillRect(ox + x - 1, oy + y + 3, 2, 1);
+        ctx.fillStyle = '#5a5a64';
+        ctx.fillRect(ox + x - 1, oy + y - 1, 3, 1);
         ctx.fillStyle = '#ff8a3a';
-        ctx.fillRect(ox + x - 1 + f, oy + y - 3, 2, 3);
+        ctx.fillRect(ox + x - 1 + f, oy + y - 3 - tall, 2, 2 + tall);
         ctx.fillStyle = '#ffe080';
         ctx.fillRect(ox + x, oy + y - 2, 1, 1);
       }

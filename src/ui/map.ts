@@ -90,8 +90,19 @@ function hash(i: number, k: number): number {
   return h - Math.floor(h);
 }
 
-function drawIsland(ctx: Ctx, x: number, y: number, i: number, fog: boolean, cleared: boolean): number {
+function drawIsland(ctx: Ctx, x: number, y: number, i: number, fog: boolean, cleared: boolean, hint = false): number {
   const rw = Math.round(18 + (ISLANDS[i - 1].half / 320) * 42);
+  // Доступный, но неизведанный остров — светлый силуэт в дымке (без деталей).
+  if (fog && hint) {
+    const l0 = Math.round(x - rw / 2);
+    rect(ctx, l0 - 6, y + 1, rw + 12, 1, '#4a6a8a');
+    rect(ctx, l0, y - 1, rw, 2, '#5a6480');
+    rect(ctx, l0 + 2, y - 3, rw - 4, 2, '#626c88');
+    rect(ctx, l0 + 5, y - 5, rw - 10, 2, '#6a7490');
+    rect(ctx, l0 + rw - 7, y - 10, 6, 9, '#6a7490');
+    rect(ctx, l0 + rw - 6, y - 12, 4, 2, '#6a7490');
+    return rw;
+  }
   const l = Math.round(x - rw / 2);
   // Вода вокруг.
   rect(ctx, l - 6, y + 1, rw + 12, 1, fog ? '#2a3040' : '#3a6a9a');
@@ -142,13 +153,15 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
   const blink = Math.floor(performance.now() / 400) % 2 === 0;
   for (let i = 1; i <= 5; i++) {
     const x = Math.round(px + (pw * (i - 0.5)) / 5);
-    const reached = i <= c.reached + (selected !== null ? 1 : 0);
+    const visited = i <= c.reached;
+    // Следующий остров можно выбрать, но он ещё не изведан.
+    const reachable = !visited && selected !== null && i === c.reached + 1;
     const cleared = c.caves.has(i);
     const cur = i === c.current;
     const sel = selected === i;
-    const rw = drawIsland(ctx, x, iy, i, !reached, cleared);
-    if (!reached) drawText(ctx, '?', x, iy - 16, { align: 'center', color: '#8a8a9a' });
-    drawText(ctx, toRoman(i), x, iy + 6, { align: 'center', color: sel ? '#fff4d8' : cur ? '#f2c84a' : reached ? '#d8ccb0' : '#8a8a9a' });
+    const rw = drawIsland(ctx, x, iy, i, !visited, cleared, reachable);
+    if (!visited) drawText(ctx, '?', x, iy - 16, { align: 'center', color: reachable ? '#c8d0e0' : '#8a8a9a' });
+    drawText(ctx, toRoman(i), x, iy + 6, { align: 'center', color: sel ? '#fff4d8' : cur ? '#f2c84a' : visited || reachable ? '#d8ccb0' : '#8a8a9a' });
     if (sel) {
       rect(ctx, x - rw / 2 - 4, iy + 14, rw + 8, 1, '#f2c84a');
       if (blink) drawText(ctx, 'v', x, iy - 22, { align: 'center', color: '#f2c84a' });
@@ -170,7 +183,7 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
 
   // ——— Схема острова на доске: текущего, а при выборе пути — выбранного ———
   const sy = Math.round(H * 0.6);
-  drawPanel(ctx, px - 10, sy - 22, pw + 20, 76, 0.7);
+  drawPanel(ctx, px - 10, sy - 22, pw + 20, 76, 0.9);
   const shownIndex = selected ?? c.current;
   const known = shownIndex === c.current ? w : c.islands.get(shownIndex)?.world ?? null;
   if (!known) {
@@ -181,9 +194,9 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
     }
     rect(ctx, px, sy, pw, 3, '#40465a');
     rect(ctx, px - 4, sy + 5, pw + 8, 3, '#2a3048');
-    drawText(ctx, 'НЕИЗВЕДАННАЯ ЗЕМЛЯ', Math.round(W / 2), sy + 16, { align: 'center', color: '#c8bca0' });
-    drawText(ctx, `ОСТРОВ ${toRoman(shownIndex)}`, Math.round(W / 2), sy + 30, { align: 'center', color: '#e8dcc0' });
-    drawText(ctx, 'Сюда ещё не ступал ни один монарх.', Math.round(W / 2), sy + 41, { align: 'center', color: '#b0a488' });
+    drawText(ctx, `ОСТРОВ ${toRoman(shownIndex)}`, Math.round(W / 2), sy + 14, { align: 'center', color: '#f2c84a' });
+    drawText(ctx, 'НЕИЗВЕДАННАЯ ЗЕМЛЯ', Math.round(W / 2), sy + 28, { align: 'center', color: '#e8dcc0' });
+    drawText(ctx, 'Сюда ещё не ступал ни один монарх.', Math.round(W / 2), sy + 40, { align: 'center', color: '#b0a488' });
     return;
   }
   drawIslandScheme(ctx, W, px, pw, sy, known, known === w ? monarchX : [], c, shownIndex);

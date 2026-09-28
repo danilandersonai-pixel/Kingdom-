@@ -314,12 +314,12 @@ describe('экономика и подданные', () => {
     expect(wall.building).toBe(false);
   });
 
-  it('лагерь бродяг не стоит на месте стены или башни', () => {
+  it('лагеря и лесные хижины не стоят на месте стены или башни', () => {
     let bad = 0;
     for (let seed = 1; seed <= 60; seed++) {
-      for (const isl of [1, 3]) {
+      for (const isl of [1, 2, 3]) {
         const w = generateIsland(seed, isl, {});
-        const camps = w.all<Structure>('structure').filter((s) => s.type === 'camp');
+        const camps = w.all<Structure>('structure').filter((s) => s.type === 'camp' || s.type === 'hermitHut' || (s.type === 'merchant' && s.constructor.name === 'MerchantHut'));
         const forts = w.all<Structure>('structure').filter((s) => s.type === 'wall' || s.type === 'tower');
         if (camps.some((c) => forts.some((f) => Math.abs(f.x - c.x) < 30))) bad++;
       }

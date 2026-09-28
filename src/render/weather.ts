@@ -69,7 +69,7 @@ export class Weather {
       const onGround = d.v < 0.9;
       const floor = onGround ? groundY + (d.v - 0.8) * 20 : waterTop + (d.v - 0.9) * 160;
       if (d.y > Math.min(h, floor)) {
-        if (rain && !onGround && fxRng.chance(0.5)) {
+        if (rain && !onGround && fxRng.chance(0.8)) {
           ripples.push({ x: camX - w / 2 + d.x, r: fxRng.range(2, 5), life: 1 });
         }
         if (rain && onGround && this.splashes.length < 60) this.splashes.push([d.x, floor, 0]);

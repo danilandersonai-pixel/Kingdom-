@@ -89,7 +89,7 @@ const KEYS: Array<[number, Key]> = [
 ];
 
 const BLOOD: Key = {
-  top: '#16030a', mid: '#3a0810', hor: '#7a1a18', far: '#461216', near: '#12050a', nearLight: '#4a1418', nearShade: '#0a0206', cloud: '#3a0c12', cloudLight: '#7a2020', overlay: '#1c0308', overlayAlpha: 0.55, glow: 1, stars: 0.35, fog: '#5a1418', fogAlpha: 0.3, water: '#1a0508',
+  top: '#16030a', mid: '#3a0810', hor: '#7a1a18', far: '#461216', near: '#12050a', nearLight: '#4a1418', nearShade: '#0a0206', cloud: '#3a0c12', cloudLight: '#7a2020', overlay: '#1c0308', overlayAlpha: 0.62, glow: 1, stars: 0.35, fog: '#5a1418', fogAlpha: 0.3, water: '#1a0508',
 };
 
 interface ParsedKey {
@@ -224,7 +224,7 @@ export function computeAtmosphere(inp: AtmosphereInput): Atmosphere {
   const bloodK = clamp(inp.blood * night, 0, 1);
   if (bloodK > 0) {
     grade = mix(grade, hex('#ff4a3a'), bloodK);
-    gradeAlpha = Math.max(gradeAlpha, 0.62 * bloodK);
+    gradeAlpha = Math.max(gradeAlpha, 0.72 * bloodK);
   }
   if (oc > 0) {
     grade = mix(grade, hex('#8a929c'), oc * 0.8);

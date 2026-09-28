@@ -227,7 +227,9 @@ export class FarDock extends Structure {
     const side = this.world.island.beachSide;
     const sx = r.sx(this.x);
     const gy = r.sy(0);
-    blit(ctx, dockSprite(), sx, gy + 4);
+    // Настил дальнего причала — вровень с берегом: монарх въезжает на доски,
+    // сваи уходят в воду.
+    blit(ctx, dockSprite(), sx, gy + 14);
     if (this.hasLighthouse) blit(ctx, lighthouseSprite(), r.sx(this.x + side * 2 * M), gy);
     else if (this.scaffold) blit(ctx, lighthouseSprite(), r.sx(this.x + side * 2 * M), gy, false, 0.4);
   }

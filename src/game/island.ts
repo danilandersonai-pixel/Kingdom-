@@ -259,15 +259,18 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
   }
 
   // ——— Особые объекты острова ———
-  const forestSpot = (minFrac: number, maxFrac: number, r = 3 * M): number => {
-    for (let t2 = 0; t2 < 80; t2++) {
-      const x = rng.sign() * rng.range(minFrac, maxFrac) * cfg.half * M;
-      if (free(x, r)) {
-        occupy(x, r);
-        return x;
-      }
+  // Свободное место в лесной полосе: все подходящие точки (с обеих сторон),
+  // потом — с меньшим запасом; наугад — только если места нет совсем.
+  const spotIn = (sides: number[], minD: number, maxD: number, r: number): number | null => {
+    for (const rr of [r, Math.max(2 * M, r * 0.66)]) {
+      const spots: number[] = [];
+      for (let d = minD; d <= maxD; d += M / 2) for (const sg of sides) if (free(sg * d, rr)) spots.push(sg * d);
+      if (spots.length) return spots[Math.floor(rng.next() * spots.length)];
     }
-    const x = rng.sign() * rng.range(minFrac, maxFrac) * cfg.half * M;
+    return null;
+  };
+  const forestSpot = (minFrac: number, maxFrac: number, r = 3 * M): number => {
+    const x = spotIn([-1, 1], minFrac * cfg.half * M, maxFrac * cfg.half * M, r) ?? rng.sign() * rng.range(minFrac, maxFrac) * cfg.half * M;
     occupy(x, r);
     return x;
   };
@@ -286,7 +289,8 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
   w.addNow(new FarDock(farDock));
   // Торговец (острова 1–2).
   if (cfg.merchant) {
-    const hx = -beachSide * rng.range(40, 60) * M;
+    // Хижина торговца — в лесу за городом, но не на месте стены или башни.
+    const hx = spotIn([-beachSide], 40 * M, 60 * M, 3 * M) ?? spotIn([-beachSide, beachSide], 34 * M, 80 * M, 3 * M) ?? -beachSide * rng.range(40, 60) * M;
     occupy(hx, 3 * M);
     const hut = w.addNow(new MerchantHut(hx));
     w.addNow(new Merchant(hx, hut.id, 1));

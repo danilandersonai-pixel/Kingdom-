@@ -646,12 +646,12 @@ export class App {
       hud: (ctx) => {
         if (showLabels) w.drawLabels(ctx, r);
         if (showHud) this.hud.draw(ctx, r, w, this.monarchs, focus);
-        if (showHud && this.touchDevice()) this.drawTouchHints(ctx);
+        const rerollHint = showHud && !!this.reroll && focus === this.monarchs[0];
+        if (showHud && this.touchDevice()) this.drawTouchHints(ctx, rerollHint);
         if (showHud) this.plaques.draw(ctx, r.w, r.h, w.time.isDay && w.time.phase > 0.04 && w.time.phase < 0.6);
-        if (showHud && this.reroll && focus === this.monarchs[0]) {
-          const touch = this.touchDevice();
-          const hint = touch ? 'ТАП ПО МОНАРХУ — ДРУГОЙ ПРАВИТЕЛЬ' : 'S ИЛИ ВНИЗ — ДРУГОЙ ПРАВИТЕЛЬ';
-          drawText(ctx, hint, Math.floor(r.w / 2), r.h - (touch ? 66 : 12), { align: 'center', color: '#f4ecd8', alpha: 0.85, outline: '#14100c' });
+        // На телефоне эта подсказка — в общей полосе внизу (drawTouchHints).
+        if (rerollHint && !this.touchDevice()) {
+          drawText(ctx, 'S ИЛИ ВНИЗ — ДРУГОЙ ПРАВИТЕЛЬ', Math.floor(r.w / 2), r.h - 12, { align: 'center', color: '#f4ecd8', alpha: 0.85, outline: '#14100c' });
         }
       },
     });
@@ -697,7 +697,7 @@ export class App {
     return this.input.touchSeen || this.coarse;
   }
 
-  private drawTouchHints(ctx: CanvasRenderingContext2D): void {
+  private drawTouchHints(ctx: CanvasRenderingContext2D, reroll = false): void {
     const { w, h } = this.screen;
     // Кнопка паузы: тёмный кружок с белым значком.
     const bx = w - 16;
@@ -713,14 +713,16 @@ export class App {
     ctx.fillRect(bx - 3, by - 4, 2, 9);
     ctx.fillRect(bx + 2, by - 4, 2, 9);
     ctx.globalAlpha = 1;
-    // Первое утро — подсказка жестов (на телефоне видна сразу, до первого касания).
-    if (this.world.time.day === 1 && this.world.time.phase < 0.3) {
-      const y0 = h - 50;
-      ctx.fillStyle = 'rgba(8,8,16,0.45)';
-      ctx.fillRect(0, y0 - 4, w, 26);
-      drawText(ctx, 'ТЯНИТЕ ПАЛЬЦЕМ — ИДТИ, К КРАЮ — ГАЛОП', Math.floor(w / 2), y0, { align: 'center', color: '#f4ecd8' });
-      drawText(ctx, 'СВАЙП ВНИЗ И ДЕРЖАТЬ — ПЛАТИТЬ', Math.floor(w / 2), y0 + 11, { align: 'center', color: '#f4ecd8' });
-    }
+    // Подсказки — одной полосой у нижнего края, над водой, а не на земле:
+    // смена правителя и (первое утро) жесты.
+    const lines: string[] = [];
+    if (reroll) lines.push('ТАП ПО МОНАРХУ — ДРУГОЙ ПРАВИТЕЛЬ');
+    if (this.world.time.day === 1 && this.world.time.phase < 0.3) lines.push('ТЯНИТЕ ПАЛЬЦЕМ — ИДТИ, К КРАЮ — ГАЛОП', 'СВАЙП ВНИЗ И ДЕРЖАТЬ — ПЛАТИТЬ');
+    if (!lines.length) return;
+    const y0 = h - 14 - lines.length * 11;
+    ctx.fillStyle = 'rgba(8,8,16,0.45)';
+    ctx.fillRect(0, y0 - 4, w, lines.length * 11 + 7);
+    lines.forEach((t, i) => drawText(ctx, t, Math.floor(w / 2), y0 + i * 11, { align: 'center', color: '#f4ecd8' }));
   }
 
   /** Кнопка «Отмена» на экране выбора острова (для касаний). */
@@ -838,7 +840,7 @@ export class App {
         ctx.globalAlpha = 1;
         drawText(ctx, 'ПОБЕДА', cx, py + 7, { align: 'center', scale: 3, color: '#ffe070', shadow: '#1a0c04', alpha: a });
         drawText(ctx, 'Все пять пещер Жадности разрушены.', cx, py + 36, { align: 'center', color: '#f4ecd8', shadow: '#1a0c04', alpha: a });
-        drawText(ctx, `Правлений: ${this.campaign.reign}. Дней последнего правления: ${toRoman(this.world.time.day)}.`, cx, py + 48, { align: 'center', color: '#e8d8b0', shadow: '#1a0c04', alpha: a });
+        drawText(ctx, `Правлений: ${this.campaign.reign}. Дней последнего правления: ${this.world.time.day}.`, cx, py + 48, { align: 'center', color: '#e8d8b0', shadow: '#1a0c04', alpha: a });
         if (this.stateTime > 3) drawText(ctx, this.pressHint(), cx, py + 63, { align: 'center', color: '#ffe070', shadow: '#1a0c04' });
         break;
       }

@@ -277,14 +277,21 @@ export function shopSprite(kind: ShopKind): Sprite {
   return build(`shop2:${kind}`, 24, 35, (ctx, w, hAll) => {
     // Вывеска над навесом: дощечка со знаком товара — видно, что продают,
     // даже когда стойка пуста.
+    // Тёмная дощечка с процарапанным светлым знаком: в воде её отражение
+    // не бросается ярким пятном.
     const sign = SHOP_SIGN[kind];
-    rect(ctx, w / 2 - 6, 0, 12, 12, '#3a2616');
-    rect(ctx, w / 2 - 5, 1, 10, 10, '#c8b08a');
-    rect(ctx, w / 2 - 5, 1, 10, 1, '#e0cca4');
-    rect(ctx, w / 2 - 1, 12, 2, 2, WOOD_D);
+    rect(ctx, w / 2 - 5, 1, 10, 10, '#2e1e12');
+    rect(ctx, w / 2 - 4, 2, 8, 8, '#6a4a2e');
+    rect(ctx, w / 2 - 4, 2, 8, 1, '#86603c');
+    rect(ctx, w / 2 - 1, 11, 2, 2, WOOD_D);
     if (sign) {
       const icon = rackItemSprite(sign);
-      ctx.drawImage(icon.img, 0, 0, icon.w, icon.h, w / 2 - 4, 1, 9, 10);
+      const [ic, ictx] = makeCanvas(icon.w, icon.h);
+      ictx.drawImage(icon.img, 0, 0);
+      ictx.globalCompositeOperation = 'source-in';
+      ictx.fillStyle = '#e8d4a8';
+      ictx.fillRect(0, 0, icon.w, icon.h);
+      ctx.drawImage(ic, 0, 0, icon.w, icon.h, w / 2 - 3, 2, 7, 8);
     }
     ctx.translate(0, 13);
     const h = hAll - 13;

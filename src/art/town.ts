@@ -301,7 +301,7 @@ function paintLevel(level: number, ctx: CanvasRenderingContext2D, w: number, h: 
       win(ctx, d, w - 12, h - 28, 2, 4, STONE[0]);
       hangingBanner(ctx, cx - 12, h - 34, 10, banner);
       hangingBanner(ctx, cx + 8, h - 34, 10, banner);
-      d.torches.push([cx - 8, h - 14], [cx + 7, h - 14]);
+      d.torches.push([cx - 8, h - 22], [cx + 7, h - 22]);
       d.chimneys.push([cx + 6, h - 58]);
       pole(ctx, d, cx, 0, 6);
       break;
@@ -325,7 +325,7 @@ function paintLevel(level: number, ctx: CanvasRenderingContext2D, w: number, h: 
       win(ctx, d, w - 8, h - 26, 2, 3, STONE[0]);
       hangingBanner(ctx, cx - 14, h - 38, 12, banner);
       hangingBanner(ctx, cx + 10, h - 38, 12, banner);
-      d.torches.push([cx - 9, h - 16], [cx + 8, h - 16]);
+      d.torches.push([cx - 9, h - 25], [cx + 8, h - 25]);
       d.chimneys.push([cx + 7, h - 70]);
       pole(ctx, d, cx, h - 84, 8);
       pole(ctx, d, 7, h - 76, 6);
@@ -362,7 +362,7 @@ function paintLevel(level: number, ctx: CanvasRenderingContext2D, w: number, h: 
       for (const [x, y] of [[7, h - 52], [w - 9, h - 52], [7, h - 32], [w - 9, h - 32], [cx - 5, h - 64], [cx + 3, h - 64], [cx - 1, h - 52]] as Array<[number, number]>) win(ctx, d, x, y, 2, 4, pal[0]);
       hangingBanner(ctx, cx - 17, h - 42, 14, banner);
       hangingBanner(ctx, cx + 13, h - 42, 14, banner);
-      d.torches.push([cx - 10, h - 19], [cx + 9, h - 19]);
+      d.torches.push([cx - 10, h - 28], [cx + 9, h - 28]);
       d.chimneys.push([cx + 8, h - 78]);
       pole(ctx, d, cx, h - 100, 8);
       pole(ctx, d, 8, h - 91, 7);

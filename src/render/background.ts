@@ -807,5 +807,28 @@ export class Background {
     void LAYER_COUNT;
     void fxRng;
     if (clipped) ctx.restore();
+    // Морская дымка на стыке: лес у берега тает в воздухе над водой, без шва.
+    if (shore) {
+      const sx = Math.round(shore.sx);
+      const wd = 44;
+      const x0 = shore.side > 0 ? sx - wd : sx;
+      if (x0 < w && x0 + wd > 0) {
+        const mist = mix(mix(a.waterDeep, a.skyHorizon, 0.55), a.fogColor, 0.3);
+        const g = ctx.createLinearGradient(x0, 0, x0 + wd, 0);
+        g.addColorStop(shore.side > 0 ? 0 : 1, rgb(mist, 0));
+        g.addColorStop(shore.side > 0 ? 1 : 0, rgb(mist, 1));
+        ctx.fillStyle = g;
+        // Сверху дымка реже — полосами с растущей плотностью к земле.
+        const top = groundY - 150;
+        const bands = 10;
+        for (let k = 0; k < bands; k++) {
+          const y0 = top + Math.round(((groundY + 20 - top) * k) / bands);
+          const y1 = top + Math.round(((groundY + 20 - top) * (k + 1)) / bands);
+          ctx.globalAlpha = 0.62 * Math.pow((k + 1) / bands, 1.4);
+          ctx.fillRect(x0, y0, wd, y1 - y0);
+        }
+        ctx.globalAlpha = 1;
+      }
+    }
   }
 }
