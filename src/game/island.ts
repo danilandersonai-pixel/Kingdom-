@@ -1,0 +1,248 @@
+// Генерация острова: город посередине, стены и башни на местах-кучах,
+// лес с полянами, лагеря бродяг, сундуки, порталы, утёс и дальняя пристань.
+
+import { World, type CampaignMeta } from './world';
+import { Rng } from '../engine/rng';
+import { ISLANDS, M } from './config';
+import { attachTerrain } from './terrain';
+import { TownCenter } from './structures/town';
+import { Wall, Tower } from './structures/defense';
+import { Tree, Camp, Chest, Rock, BerryBush } from './structures/nature';
+import { Portal } from './structures/portal';
+import { Person } from './entities/person';
+import { Coin } from './entities/pickups';
+import { Director } from './director';
+import {
+  installTownSystem,
+  installCampSystem,
+  installDefenseSystem,
+  installWildlife,
+  installTerrainGrowth,
+  installCrownPickup,
+  installBells,
+} from './systems';
+import type { TreeKind } from '../render/treegen';
+import { HUMAN_VARIANTS } from '../art/humans';
+
+export interface IslandLayout {
+  /** Места под стены (в пикселях от центра). */
+  walls: number[];
+  towers: number[];
+  clearings: Array<[number, number]>;
+  beachSide: -1 | 1;
+  centralDock: number;
+  farDock: number;
+}
+
+export interface GenerateOptions {
+  meta?: CampaignMeta;
+  /** Новое правление: монарх въезжает слева к костру с монетами по пути. */
+  newReign?: boolean;
+  /** Разрушенные порталы (сохраняются между правлениями), по индексу. */
+  destroyedPortals?: Set<string>;
+}
+
+export function generateIsland(campaignSeed: number, index: number, opts: GenerateOptions = {}): World {
+  const cfg = ISLANDS[index - 1];
+  const L = cfg.half * M;
+  const seed = (campaignSeed * 7919 + index * 104729) >>> 0;
+  const rng = new Rng(seed);
+  const beachSide = rng.sign() as -1 | 1;
+  const cliffSide = -beachSide as -1 | 1;
+  const w = new World({ index, seed, left: -L, right: L, beachSide, tech: 0 });
+  if (opts.meta) w.meta = opts.meta;
+  attachTerrain(w);
+  w.cache.townX = 0;
+
+  const occupied: Array<[number, number]> = [];
+  const free = (x: number, r: number) => !occupied.some(([a, b]) => x + r > a && x - r < b);
+  const occupy = (x: number, r: number) => occupied.push([x - r, x + r]);
+
+  // ——— Город ———
+  const tc = w.addNow(new TownCenter(0, 0));
+  occupy(0, 18 * M);
+
+  // ——— Пристани ———
+  const centralDock = beachSide * 27 * M;
+  const farDock = beachSide * (L - 6 * M);
+
+  // ——— Места под стены и башни ———
+  const wallSpots: number[] = [];
+  const towerSpots: number[] = [];
+  for (const side of [-1, 1] as const) {
+    let d = rng.range(13, 15);
+    let k = 0;
+    while (d < cfg.half * 0.74) {
+      const x = side * d * M;
+      if (side === beachSide && Math.abs(x - centralDock) < 5 * M) {
+        d += 6;
+        continue;
+      }
+      wallSpots.push(x);
+      occupy(x, 1.5 * M);
+      // Башня между этой и следующей стеной — через одну.
+      if (k % 2 === 0) {
+        const tx = side * (d + rng.range(6, 8)) * M;
+        if (!(side === beachSide && Math.abs(tx - centralDock) < 6 * M)) {
+          towerSpots.push(tx);
+          occupy(tx, 1.4 * M);
+        }
+      }
+      d += rng.range(13, 21);
+      k++;
+    }
+  }
+  for (const x of wallSpots) w.addNow(new Wall(x, 0));
+  for (const x of towerSpots) w.addNow(new Tower(x, 0));
+
+  // ——— Порталы ———
+  const portalKey = (kind: string, n: number) => `${index}:${kind}:${n}`;
+  const destroyed = opts.destroyedPortals ?? new Set<string>();
+  let pn = 0;
+  for (const side of [-1, 1] as const) {
+    for (let i = 0; i < cfg.smallPortals; i++) {
+      const t = cfg.smallPortals === 1 ? 0.62 : 0.5 + (0.3 * i) / (cfg.smallPortals - 1);
+      const x = side * (t * cfg.half + rng.range(-4, 4)) * M;
+      const p = w.addNow(new Portal(x, 'small', side));
+      if (destroyed.has(portalKey('small', pn))) {
+        p.destroyed = true;
+        p.hp = 0;
+      }
+      (p as Portal & { key: string }).key = portalKey('small', pn++);
+      occupy(x, 4 * M);
+    }
+  }
+  const dockPortal = w.addNow(new Portal(beachSide * (L - 24 * M), 'dock', beachSide));
+  (dockPortal as Portal & { key: string }).key = portalKey('dock', 0);
+  if (destroyed.has(portalKey('dock', 0))) {
+    dockPortal.destroyed = true;
+    dockPortal.hp = 0;
+  }
+  occupy(dockPortal.x, 5 * M);
+  const cliffPortal = w.addNow(new Portal(cliffSide * (L - 13 * M), 'cliff', cliffSide));
+  (cliffPortal as Portal & { key: string }).key = portalKey('cliff', 0);
+  occupy(cliffPortal.x, 14 * M);
+  occupy(centralDock, 5 * M);
+  occupy(farDock, 8 * M);
+
+  // ——— Поляны (равнины) и лес ———
+  const clearings: Array<[number, number]> = [[-24 * M, 24 * M]];
+  for (const side of [-1, 1] as const) {
+    const n = rng.int(1, 2);
+    for (let i = 0; i < n; i++) {
+      const c = side * rng.range(0.32, 0.85) * cfg.half * M;
+      const half = rng.range(5, 10) * M;
+      clearings.push([c - half, c + half]);
+    }
+  }
+  clearings.push([farDock - 12 * M, farDock + 12 * M]);
+  const inClearing = (x: number) => clearings.some(([a, b]) => x > a && x < b);
+
+  // ——— Лагеря бродяг (только в лесу) ———
+  const campXs: number[] = [];
+  if (index === 1) campXs.push(36 * M);
+  let tries = 0;
+  while (campXs.length < cfg.camps && tries++ < 200) {
+    const side = rng.sign();
+    const x = side * rng.range(0.28, 0.8) * cfg.half * M;
+    if (inClearing(x) || !free(x, 4 * M) || campXs.some((c) => Math.abs(c - x) < 18 * M)) continue;
+    campXs.push(x);
+  }
+  for (const x of campXs) occupy(x, 4 * M);
+
+  // Деревья.
+  const kinds: TreeKind[] = ['pine', 'pine', 'oak', 'oak', 'birch'];
+  for (const side of [-1, 1] as const) {
+    let d = 24 * M + rng.range(0, 2 * M);
+    const end = L - 10 * M;
+    while (d < end) {
+      const x = side * d;
+      const nearCamp = campXs.some((c) => Math.abs(c - x) < 3 * M);
+      const nearPortal = Math.abs(x - cliffPortal.x) < 16 * M || Math.abs(x - dockPortal.x) < 4 * M;
+      if (!inClearing(x) && !nearCamp && !nearPortal && !wallSpots.some((ws) => Math.abs(ws - x) < 1.2 * M) && !towerSpots.some((t) => Math.abs(t - x) < 1.2 * M)) {
+        const kind = rng.pick(kinds);
+        const h = kind === 'pine' ? rng.int(70, 120) : kind === 'birch' ? rng.int(60, 90) : rng.int(60, 100);
+        w.addNow(new Tree(x, kind, rng.int(0, 11), h));
+      }
+      d += rng.range(2.2, 4) * M;
+    }
+  }
+
+  for (const x of campXs) {
+    const camp = w.addNow(new Camp(x));
+    for (let i = 0; i < 2; i++) {
+      const p = w.addNow(new Person(x + rng.range(-10, 10), 'vagrant', rng.int(0, HUMAN_VARIANTS - 1)));
+      p.homeCamp = camp.id;
+      camp.vagrants.push(p.id);
+    }
+  }
+
+  // Два бродяги у стоянки.
+  for (let i = 0; i < 2; i++) w.addNow(new Person(rng.range(-6, 6) * M, 'vagrant', rng.int(0, HUMAN_VARIANTS - 1)));
+
+  // ——— Сундуки ———
+  const chestSpot = () => {
+    for (let t = 0; t < 60; t++) {
+      const x = rng.sign() * rng.range(0.3, 0.9) * cfg.half * M;
+      if (free(x, 2 * M)) {
+        occupy(x, 2 * M);
+        return x;
+      }
+    }
+    return rng.range(-L * 0.5, L * 0.5);
+  };
+  for (let i = 0; i < 2; i++) w.addNow(new Chest(chestSpot(), false, 12));
+  let gems = cfg.gems;
+  while (gems > 0) {
+    const n = Math.min(gems, gems === 5 ? 3 : rng.int(2, 4));
+    w.addNow(new Chest(chestSpot(), true, n));
+    gems -= n;
+  }
+
+  // ——— Ягодные кусты и камни ———
+  for (let i = 0; i < 4; i++) {
+    const x = rng.sign() * rng.range(0.25, 0.7) * cfg.half * M;
+    if (free(x, 2 * M)) {
+      occupy(x, 1.5 * M);
+      w.addNow(new BerryBush(x));
+    }
+  }
+  for (let i = 0; i < 10; i++) {
+    const x = rng.range(-L + 30, L - 30);
+    if (free(x, M)) w.addNow(new Rock(x, rng.int(0, 3)));
+  }
+
+  // ——— Трава на равнинах ———
+  const t = w.terrain;
+  for (let i = 0; i < t.cells; i++) {
+    const x = t.cellX(i);
+    if (!t.forest[i] && !t.blocked[i] && Math.abs(x) > 6 * M) t.grass[i] = rng.range(0.6, 1);
+  }
+  t.dailyGrowth('spring', 0, seed);
+  t.dailyGrowth('summer', 1, seed);
+
+  // ——— Монеты по пути к костру (новое правление) ———
+  if (opts.newReign) {
+    for (let i = 0; i < 6; i++) {
+      const c = new Coin((-30 + i * 4 + rng.range(-1, 1)) * M, 0, 0, 0);
+      c.settled = true;
+      c.age = -9999;
+      w.addNow(c);
+    }
+  }
+
+  // ——— Системы ———
+  installTownSystem(w);
+  installCampSystem(w);
+  installDefenseSystem(w);
+  installWildlife(w);
+  installTerrainGrowth(w);
+  installCrownPickup(w);
+  installBells(w);
+  const director = new Director(w);
+  w.systems.push(director);
+  w.director = director;
+  w.layout = { walls: wallSpots, towers: towerSpots, clearings, beachSide, centralDock, farDock };
+  void tc;
+  return w;
+}
