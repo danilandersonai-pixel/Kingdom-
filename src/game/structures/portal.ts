@@ -5,7 +5,7 @@ import { Structure } from './structure';
 import type { Renderer } from '../../render/renderer';
 import type { Light } from '../../render/lighting';
 import { blit, hex } from '../../engine/sprite';
-import { portalFrame, cliffSprite } from '../../art/buildings';
+import { portalSprite, cliffSprite } from '../../art/portal';
 import { GREED, M } from '../config';
 import { fxRng } from '../../engine/rng';
 
@@ -36,7 +36,7 @@ export class Portal extends Structure {
   }
 
   get drawRadius(): number {
-    return this.kind === 'cliff' ? 100 : 30;
+    return this.kind === 'cliff' ? 150 : 45;
   }
 
   get alive(): boolean {
@@ -95,11 +95,10 @@ export class Portal extends Structure {
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     const sx = r.sx(this.x);
     const gy = r.sy(0);
-    if (this.kind === 'cliff') {
-      blit(ctx, cliffSprite(this.side), r.sx(this.x + this.side * 38), gy);
-    }
+    // Утёс привязан к зеву пещеры — портал стоит прямо в нём.
+    if (this.kind === 'cliff') blit(ctx, cliffSprite(this.side), sx, gy);
     const big = this.kind !== 'small';
-    const f = portalFrame(this.world.clock, this.destroyed, big);
+    const f = portalSprite(this.world.clock, this.destroyed, big);
     blit(ctx, f, sx, gy);
     if (this.kind === 'dock' && this.tentacle > 0 && !this.destroyed) {
       ctx.fillStyle = '#1b1123';
