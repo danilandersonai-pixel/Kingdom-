@@ -38,6 +38,13 @@ export interface Atmosphere {
   fogAlpha: number;
   foreground: RGB;
   bloodMoon: boolean;
+  /** Фаза луны 0..1 (0 — новолуние, 0.5 — полнолуние). */
+  moonPhase: number;
+  /** Зимняя ночь — может быть северное сияние. */
+  aurora: number;
+  /** Экранные доли X солнца и луны (свет спрайтов — слева). */
+  sunX: number;
+  moonX: number;
 }
 
 interface Key {
@@ -137,6 +144,8 @@ export interface AtmosphereInput {
   overcast: number;
   /** 0..1 — зимняя белизна (снег). */
   snow: number;
+  /** Номер дня (для фазы луны). */
+  day?: number;
 }
 
 export const LAYER_COUNT = 5;
@@ -207,7 +216,17 @@ export function computeAtmosphere(inp: AtmosphereInput): Atmosphere {
     fogAlpha: k.fogAlpha,
     foreground: mix(k.nearShade, hex('#000000'), 0.35),
     bloodMoon: inp.blood > 0.5,
+    moonPhase: inp.blood > 0.5 ? 0.5 : moonPhaseOf(inp.day ?? 15),
+    aurora: inp.season === 'winter' && inp.blood <= 0 ? night * (1 - oc) * (0.55 + 0.45 * Math.sin((inp.day ?? 0) * 1.7)) : 0,
+    sunX: 0.27,
+    moonX: 0.72,
   };
+}
+
+/** Фаза луны: полнолуние приходится на 15-й день сезона (ночь Кровавой луны). */
+export function moonPhaseOf(day: number): number {
+  const d = ((day - 1) % 16) + 1;
+  return (((d - 15) / 16 + 0.5) % 1 + 1) % 1;
 }
 
 /** 0 днём, 1 глубокой ночью. */

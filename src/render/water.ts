@@ -22,6 +22,7 @@ export function drawWater(
   camX: number,
   ripples: Ripple[],
   frozen = 0,
+  lilies = false,
 ): void {
   const waterH = h - waterTop;
   ctx.fillStyle = rgb(a.waterDeep);
@@ -52,23 +53,97 @@ export function drawWater(
   ctx.fillStyle = rgb(mix(a.skyHorizon, a.waterDeep, 0.55), 0.55);
   ctx.fillRect(0, waterTop, w, 1);
 
+  // Дорожка света от солнца (ярче на закате и рассвете) или луны.
+  const sunLow = a.sunH > -0.05 ? 1 - Math.min(1, Math.max(0, a.sunH) / 0.5) : 0;
+  const moonLit = a.moonH > 0 ? (a.bloodMoon ? 1 : (1 - Math.cos(a.moonPhase * Math.PI * 2)) / 2) * Math.min(1, a.moonH * 3) : 0;
+  const useSun = a.sunH > -0.05;
+  const strength = (useSun ? 0.18 + sunLow * 0.5 : moonLit * 0.45) * (1 - frozen * 0.6);
+  if (strength > 0.03) {
+    const col = useSun ? mix(a.sunColor, hex('#ffb060'), sunLow * 0.5) : a.moonColor;
+    const cx = w * (useSun ? a.sunX : a.moonX);
+    for (let r = 1; r < waterH; r += 1) {
+      const depth = r / waterH;
+      const spread = 4 + r * 0.7;
+      const dashes = 1 + Math.floor(depth * 3);
+      for (let k = 0; k < dashes; k++) {
+        const hv = hash2(r * 7 + k, Math.floor(time * 4 + k));
+        if (hv < 0.35) continue;
+        const x = Math.round(cx + (hash2(r, k + Math.floor(time * 3)) - 0.5) * spread * 2);
+        const len = 1 + Math.floor(hv * (2 + depth * 5));
+        const alpha = strength * (1 - depth * 0.75) * (0.5 + 0.5 * hv);
+        ctx.fillStyle = rgb(col, alpha);
+        ctx.fillRect(x, waterTop + r, len, 1);
+      }
+    }
+  }
+
   if (frozen > 0.01) {
     // Лёд: белёсая корка, трещины и снежные полосы, привязанные к миру.
-    ctx.fillStyle = `rgba(214,228,240,${(0.38 * frozen).toFixed(3)})`;
+    // Цвет льда берём из неба — ночью он синий и тёмный, а не светится.
+    const ice = mix(mix(a.cloudLight, a.skyHorizon, 0.5), a.waterDeep, 0.25);
+    const snowy = mix(ice, a.cloudLight, 0.6);
+    const crack = mix(ice, a.waterDeep, 0.6);
+    ctx.fillStyle = rgb(ice, 0.42 * frozen);
     ctx.fillRect(0, waterTop, w, waterH);
     const left0 = camX - w / 2;
-    ctx.fillStyle = `rgba(255,255,255,${(0.35 * frozen).toFixed(3)})`;
     for (let c = Math.floor(left0 / 40) - 1; c <= Math.floor((left0 + w) / 40) + 1; c++) {
       const hv = hash2(c, 77);
       const x = Math.round(c * 40 + hv * 30 - left0);
       const y = waterTop + 2 + Math.floor(hash2(c, 78) * (waterH - 6));
+      ctx.fillStyle = rgb(snowy, 0.45 * frozen);
       ctx.fillRect(x, y, 6 + Math.floor(hv * 18), 1);
-      ctx.fillStyle = `rgba(120,150,180,${(0.4 * frozen).toFixed(3)})`;
+      ctx.fillStyle = rgb(crack, 0.55 * frozen);
       ctx.fillRect(x + 3, y + 2, 1, 2);
       ctx.fillRect(x + 4, y + 4, 2, 1);
-      ctx.fillStyle = `rgba(255,255,255,${(0.35 * frozen).toFixed(3)})`;
     }
+    // Лунная/солнечная дорожка на льду — мягкое пятно.
     return;
+  }
+
+  // Кувшинки у берега: листья-блюдца и редкие цветы, чуть покачиваются.
+  if (lilies) {
+    const left0 = camX - w / 2;
+    for (let c = Math.floor(left0 / 70) - 1; c <= Math.floor((left0 + w) / 70) + 1; c++) {
+      if (hash2(c, 301) > 0.3) continue;
+      const n = 1 + Math.floor(hash2(c, 302) * 3);
+      for (let k = 0; k < n; k++) {
+        const x = Math.round(c * 70 + hash2(c, 303 + k) * 50 - left0 + k * 6);
+        const y = waterTop + 3 + Math.floor(hash2(c, 310 + k) * 9);
+        const bob = Math.round(Math.sin(time * 1.1 + c + k) * 0.6);
+        const pw = 4 + Math.floor(hash2(c, 320 + k) * 3);
+        ctx.fillStyle = '#2e5a2a';
+        ctx.fillRect(x + bob, y, pw, 1);
+        ctx.fillStyle = '#467a36';
+        ctx.fillRect(x + bob + 1, y - 1, pw - 2, 1);
+        // Вырез листа.
+        ctx.fillStyle = rgb(a.waterDeep);
+        ctx.fillRect(x + bob + (pw >> 1), y, 1, 1);
+        if (hash2(c, 330 + k) > 0.6) {
+          ctx.fillStyle = hash2(c, 340 + k) > 0.5 ? '#f4d0e0' : '#f6f2ea';
+          ctx.fillRect(x + bob + 1, y - 2, 2, 1);
+          ctx.fillStyle = '#f2d44a';
+          ctx.fillRect(x + bob + 1, y - 2, 1, 1);
+        }
+      }
+    }
+  }
+
+  // Туман над водой на рассвете и в сырую погоду.
+  if (a.fogAlpha > 0.14) {
+    const k = Math.min(0.5, (a.fogAlpha - 0.14) * 2.2);
+    const left0 = camX * 0.8 - w / 2;
+    for (let band = 0; band < 3; band++) {
+      const y = waterTop - 3 + band * 4;
+      const scroll = left0 + time * (4 + band * 2);
+      const start = Math.floor(scroll / 8);
+      const frac = scroll - start * 8;
+      for (let i = -1; i <= Math.ceil(w / 8) + 1; i++) {
+        const v = hash2(start + i, band * 13 + 5);
+        if (v < 0.35) continue;
+        ctx.fillStyle = rgb(a.fogColor, k * v * (0.5 - band * 0.12));
+        ctx.fillRect(Math.round(i * 8 - frac), y, 8, 3);
+      }
+    }
   }
 
   // Блики: короткие горизонтальные штрихи, привязанные к миру.

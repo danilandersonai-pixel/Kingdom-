@@ -497,6 +497,7 @@ export class App {
     r.frozen = Math.max(0, Math.min(1, r.frozen + (winter ? dt : -dt) * 0.2));
     const clear = r.weather.kind === 'rain' ? 1 - r.weather.intensity : 1;
     r.rays = w.time.isDay && !winter ? clear : Math.max(0, r.rays - dt);
+    r.lilies = w.time.season === 'spring' || w.time.season === 'summer';
     this.ambience.update(dt, { season: w.time.season, night: nightFactor(w.time.phase), day: w.time.isDay, rain: r.weather.kind === 'rain' ? r.weather.intensity : 0, frozen: r.frozen > 0.5 });
   }
 
@@ -535,6 +536,7 @@ export class App {
       blood: t.isBloodMoon ? 1 : 0,
       overcast: this.renderer.weather.kind === 'rain' ? this.renderer.weather.intensity : 0,
       snow: t.season === 'winter' ? 1 : 0,
+      day: t.day,
     });
   }
 

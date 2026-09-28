@@ -39,6 +39,8 @@ export class Renderer {
   frozen = 0;
   /** Солнечные лучи сквозь лес (0..1). */
   rays = 0;
+  /** Кувшинки на воде (весна и лето). */
+  lilies = false;
   /** Атмосфера последнего кадра (для объектов, которые рисуют воду сами). */
   atmos: Atmosphere | null = null;
 
@@ -191,7 +193,7 @@ export class Renderer {
 
     this.sceneCtx.clearRect(0, 0, w, this.waterTop);
     this.sceneCtx.drawImage(this.screen.buffer, 0, 0, w, this.waterTop, 0, 0, w, this.waterTop);
-    drawWater(ctx, this.sceneCopy, this.waterTop, w, h, time, a, camX, this.ripples, this.frozen);
+    drawWater(ctx, this.sceneCopy, this.waterTop, w, h, time, a, camX, this.ripples, this.frozen, this.lilies);
     this.ground.drawReeds(ctx, camX, w, this.waterTop, time);
     cb.water?.(ctx);
 

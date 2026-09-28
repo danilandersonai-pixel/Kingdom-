@@ -4,7 +4,7 @@
 
 import { Rng, fxRng } from '../engine/rng';
 import { fbm1, hash2, clamp } from '../engine/math';
-import { makeCanvas, rgb, type RGB, mix } from '../engine/sprite';
+import { makeCanvas, rgb, type RGB, mix, hex } from '../engine/sprite';
 import type { Atmosphere, Season } from './atmosphere';
 import { LAYER_COUNT } from './atmosphere';
 import { makeTree, masksToCanvases, makeBush, type TreeKind } from './treegen';
@@ -234,6 +234,8 @@ interface Cloud {
   y: number;
   speed: number;
   item: AtlasItem;
+  /** 0 — дальний слой (меньше, бледнее, медленнее), 1 — ближний. */
+  layer: number;
 }
 
 interface Star {
@@ -244,28 +246,43 @@ interface Star {
   big: boolean;
 }
 
+interface Meteor {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+}
+
+/** Облачные маски: тень, основа, свет, кромка со стороны солнца. */
+const CLOUD_TONES = 4;
+
 export class Background {
   private layers: Layer[] = [];
   private stars: Star[] = [];
   private clouds: Cloud[] = [];
-  private cloudBase!: HTMLCanvasElement;
-  private cloudShade!: HTMLCanvasElement;
-  private cloudLight!: HTMLCanvasElement;
+  private cloudMasks: HTMLCanvasElement[] = [];
   private cloudColored!: HTMLCanvasElement;
   private cloudColoredCtx!: CanvasRenderingContext2D;
   private cloudScratch!: [HTMLCanvasElement, CanvasRenderingContext2D];
   private cloudTone = '';
   private season: Season;
   private recolorTimer = 0;
+  private milky!: HTMLCanvasElement;
+  private meteors: Meteor[] = [];
+  private aurora: [HTMLCanvasElement, CanvasRenderingContext2D] | null = null;
+  private auroraT = 0;
+  private lastTime = 0;
 
   constructor(seed: number, season: Season) {
     this.season = season;
     for (let i = 0; i < LAYERS.length; i++) this.layers.push(new Layer(LAYERS[i], i, seed, season));
     const rng = new Rng(seed ^ 0xabcdef);
-    for (let i = 0; i < 170; i++) {
+    for (let i = 0; i < 190; i++) {
       this.stars.push({ x: rng.next(), y: Math.pow(rng.next(), 1.4), b: rng.range(0.3, 1), tw: rng.range(0.5, 3), big: rng.chance(0.07) });
     }
     this.buildClouds(rng);
+    this.buildMilkyWay(rng);
   }
 
   setSeason(season: Season): void {
@@ -274,83 +291,134 @@ export class Background {
     for (const l of this.layers) l.build(season);
   }
 
+  /** Кучевые облака из освещённых «шаров» и перистые полосы. */
   private buildClouds(rng: Rng): void {
-    const shapes: Array<{ w: number; h: number; base: Uint8Array; tone: Uint8Array }> = [];
-    for (let i = 0; i < 7; i++) {
-      const w = rng.int(40, 110);
-      const h = rng.int(10, 22);
-      const base = new Uint8Array(w * h);
+    const shapes: Array<{ w: number; h: number; tone: Uint8Array }> = [];
+    const LX = -0.55;
+    const LY = -0.7;
+    const LZ = 0.45;
+    for (let i = 0; i < 12; i++) {
+      const stratus = i >= 8;
+      const w = stratus ? rng.int(90, 200) : rng.int(46, 130);
+      const h = stratus ? rng.int(5, 9) : rng.int(Math.max(14, Math.round(w * 0.2)), Math.max(18, Math.round(w * 0.32)));
       const tone = new Uint8Array(w * h);
-      const blobs = rng.int(4, 8);
+      const zb = new Float32Array(w * h).fill(-1);
       const circles: Array<[number, number, number]> = [];
-      for (let b = 0; b < blobs; b++) {
-        const r = rng.range(h * 0.35, h * 0.6);
-        circles.push([rng.range(r, w - r), h - r - rng.range(0, h * 0.25), r]);
+      if (stratus) {
+        const n = Math.round(w / 9);
+        for (let b = 0; b < n; b++) {
+          const t = (b + 0.5) / n;
+          const r = h * rng.range(0.5, 0.95) * (0.55 + 0.45 * Math.sin(Math.PI * t));
+          circles.push([t * w, h - r * 0.8, r]);
+        }
+      } else {
+        // Крупные шары в середине, мелкие по краям; плоское дно.
+        const n = rng.int(5, 9);
+        for (let b = 0; b < n; b++) {
+          const t = (b + 0.5) / n;
+          const bell = Math.sin(Math.PI * t);
+          const r = h * (0.28 + 0.42 * bell) * rng.range(0.85, 1.15);
+          circles.push([t * w + rng.range(-3, 3), h - r * rng.range(0.75, 1.0) - 1, r]);
+        }
+        // Верхние «шапки».
+        const caps = rng.int(1, 3);
+        for (let b = 0; b < caps; b++) {
+          const x = rng.range(0.3, 0.7) * w;
+          const r = h * rng.range(0.3, 0.45);
+          circles.push([x, h * rng.range(0.3, 0.5), r]);
+        }
       }
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
-          let inside = false;
           for (const [cx, cy, r] of circles) {
-            const dx = (x - cx) / (r * 1.5);
-            const dy = (y - cy) / r;
-            if (dx * dx + dy * dy <= 1) inside = true;
+            const dx = (x + 0.5 - cx) / (r * (stratus ? 2.2 : 1.25));
+            const dy = (y + 0.5 - cy) / r;
+            const d2 = dx * dx + dy * dy;
+            if (d2 > 1) continue;
+            const z = Math.sqrt(1 - d2) * r;
+            const i2 = y * w + x;
+            if (z <= zb[i2]) continue;
+            zb[i2] = z;
+            const nz = Math.sqrt(1 - d2);
+            let lum = 0.3 + 0.7 * Math.max(0, dx * LX + dy * LY + nz * LZ);
+            lum -= Math.max(0, (y - h * 0.62) / h) * 0.9; // тень снизу
+            lum += (hash2(x, y + i * 97) - 0.5) * 0.12;
+            tone[i2] = lum < 0.38 ? 1 : lum < 0.62 ? 2 : 3;
           }
-          // Плоское дно облака.
-          if (inside && y <= h - 2) base[y * w + x] = 1;
         }
       }
+      // Плоское дно и кромка со стороны солнца.
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const i2 = y * w + x;
-          if (!base[i2]) continue;
-          const up = y === 0 || !base[i2 - w];
-          const up2 = y < 2 || !base[i2 - 2 * w];
-          const down = y === h - 1 || !base[i2 + w];
-          if (up || (up2 && hash2(x, y + i * 99) > 0.5)) tone[i2] = 2;
-          else if (down || (y > h * 0.62 && hash2(x, y) > 0.35)) tone[i2] = 1;
+          if (!tone[i2]) continue;
+          if (y >= h - 2 && !stratus) tone[i2] = 1;
+          const up = y === 0 || !tone[i2 - w];
+          const left = x === 0 || !tone[i2 - 1];
+          if ((up || left) && tone[i2] >= 2) tone[i2] = 4;
         }
       }
-      shapes.push({ w, h, base, tone });
+      shapes.push({ w, h, tone });
     }
     const width = shapes.reduce((s, c) => s + c.w + 1, 0);
     const height = Math.max(...shapes.map((s) => s.h));
-    const [b, bc] = makeCanvas(width, height);
-    const [s, sc] = makeCanvas(width, height);
-    const [l, lc] = makeCanvas(width, height);
+    const masks = Array.from({ length: CLOUD_TONES }, () => makeCanvas(width, height));
+    const datas = masks.map(([, c]) => c.createImageData(width, height));
     const items: AtlasItem[] = [];
     let x = 0;
     for (const sh of shapes) {
       for (let y = 0; y < sh.h; y++) {
         for (let xx = 0; xx < sh.w; xx++) {
-          const i2 = y * sh.w + xx;
-          if (!sh.base[i2]) continue;
-          const yy = height - sh.h + y;
-          bc.fillStyle = '#fff';
-          bc.fillRect(x + xx, yy, 1, 1);
-          if (sh.tone[i2] === 1) {
-            sc.fillStyle = '#fff';
-            sc.fillRect(x + xx, yy, 1, 1);
-          } else if (sh.tone[i2] === 2) {
-            lc.fillStyle = '#fff';
-            lc.fillRect(x + xx, yy, 1, 1);
-          }
+          const t = sh.tone[y * sh.w + xx];
+          if (!t) continue;
+          const o = ((height - sh.h + y) * width + x + xx) * 4;
+          const d = datas[t - 1].data;
+          d[o] = d[o + 1] = d[o + 2] = d[o + 3] = 255;
         }
       }
       items.push({ x, w: sh.w, h: sh.h, ax: 0 });
       x += sh.w + 1;
     }
-    this.cloudBase = b;
-    this.cloudShade = s;
-    this.cloudLight = l;
+    masks.forEach(([, c], i) => c.putImageData(datas[i], 0, 0));
+    this.cloudMasks = masks.map(([cv]) => cv);
     [this.cloudColored, this.cloudColoredCtx] = makeCanvas(width, height);
     this.cloudScratch = makeCanvas(width, height);
-    for (let i = 0; i < 9; i++) {
-      this.clouds.push({ x: rng.range(0, 2400), y: rng.range(0.08, 0.5), speed: rng.range(1.5, 5), item: rng.pick(items) });
+    for (let i = 0; i < 14; i++) {
+      const layer = i < 6 ? 0 : 1;
+      const item = items[layer === 0 ? rng.int(0, items.length - 1) : rng.int(0, 7)];
+      this.clouds.push({ x: rng.range(0, 2600), y: layer === 0 ? rng.range(0.12, 0.62) : rng.range(0.04, 0.46), speed: rng.range(1.5, 5) * (layer ? 1 : 0.55), item, layer });
     }
+    this.clouds.sort((a, b) => a.layer - b.layer);
+  }
+
+  /** Млечный путь — пыльная полоса звёзд. */
+  private buildMilkyWay(rng: Rng): void {
+    const W = 900;
+    const Hh = 220;
+    const [c, ctx] = makeCanvas(W, Hh);
+    const img = ctx.createImageData(W, Hh);
+    for (let i = 0; i < 5200; i++) {
+      const t = rng.next();
+      const x = t * W;
+      const center = Hh * (0.85 - t * 0.7);
+      const off = (rng.next() + rng.next() + rng.next() - 1.5) * 26;
+      const y = Math.round(center + off);
+      if (y < 0 || y >= Hh) continue;
+      const o = (y * W + Math.floor(x)) * 4;
+      const b = 120 + Math.floor(rng.next() * 135);
+      img.data[o] = b;
+      img.data[o + 1] = b;
+      img.data[o + 2] = Math.min(255, b + 30);
+      img.data[o + 3] = Math.floor(40 + rng.next() * 90 * (1 - Math.abs(off) / 40));
+    }
+    ctx.putImageData(img, 0, 0);
+    this.milky = c;
   }
 
   private recolorClouds(a: Atmosphere): void {
-    const key = `${a.cloudBase.map(Math.round)}|${a.cloudLight.map(Math.round)}`;
+    const rim = mix(a.cloudLight, a.bloodMoon ? a.moonColor : a.starAlpha > 0.5 ? hex('#aab8e8') : hex('#fff4dc'), 0.45);
+    const cols: RGB[] = [a.cloudShade, a.cloudBase, a.cloudLight, rim];
+    const key = cols.map((c) => c.map(Math.round).join(',')).join('|');
     if (key === this.cloudTone) return;
     this.cloudTone = key;
     const c = this.cloudColoredCtx;
@@ -358,33 +426,33 @@ export class Background {
     const h = this.cloudColored.height;
     c.globalCompositeOperation = 'source-over';
     c.clearRect(0, 0, w, h);
-    c.drawImage(this.cloudBase, 0, 0);
-    c.globalCompositeOperation = 'source-in';
-    c.fillStyle = rgb(a.cloudBase);
-    c.fillRect(0, 0, w, h);
-    c.globalCompositeOperation = 'source-over';
     const [sc, scc] = this.cloudScratch;
-    for (const [mask, col] of [
-      [this.cloudShade, a.cloudShade],
-      [this.cloudLight, a.cloudLight],
-    ] as const) {
+    this.cloudMasks.forEach((mask, i) => {
       scc.globalCompositeOperation = 'source-over';
       scc.clearRect(0, 0, w, h);
       scc.drawImage(mask, 0, 0);
       scc.globalCompositeOperation = 'source-in';
-      scc.fillStyle = rgb(col);
+      scc.fillStyle = rgb(cols[i]);
       scc.fillRect(0, 0, w, h);
       c.drawImage(sc, 0, 0);
-    }
+    });
   }
 
   update(dt: number): void {
     for (const c of this.clouds) c.x += c.speed * dt;
     this.recolorTimer -= dt;
+    for (const m of this.meteors) {
+      m.x += m.vx * dt;
+      m.y += m.vy * dt;
+      m.life -= dt;
+    }
+    this.meteors = this.meteors.filter((m) => m.life > 0);
   }
 
   /** Небо, светила и облака. */
   drawSky(ctx: CanvasRenderingContext2D, a: Atmosphere, camX: number, w: number, horizonY: number, time: number): void {
+    const dt = Math.min(0.1, Math.max(0, time - this.lastTime));
+    this.lastTime = time;
     const g = ctx.createLinearGradient(0, 0, 0, horizonY);
     g.addColorStop(0, rgb(a.skyTop));
     g.addColorStop(0.55, rgb(a.skyMid));
@@ -392,8 +460,12 @@ export class Background {
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, w, horizonY + 40);
 
-    // Звёзды.
+    // Звёзды и Млечный путь.
     if (a.starAlpha > 0.01) {
+      ctx.globalAlpha = a.starAlpha * 0.55;
+      const mx = -((camX * 0.01) % 300) - 200;
+      ctx.drawImage(this.milky, Math.round(mx), 0, this.milky.width, Math.round(horizonY * 0.95));
+      ctx.globalAlpha = 1;
       const shift = camX * 0.01;
       for (const s of this.stars) {
         const tw = 0.55 + 0.45 * Math.sin(time * s.tw + s.x * 100);
@@ -412,43 +484,132 @@ export class Background {
           ctx.fillRect(sx, sy + 1, 1, 1);
         }
       }
-    }
-
-    // Солнце.
-    if (a.sunH > -0.05) {
-      // Солнце слева-сверху: так же освещены деревья, горы и постройки.
-      const sx = Math.round(w * 0.27);
-      const sy = Math.round(horizonY - 8 - a.sunH * (horizonY - 34));
-      this.glow(ctx, sx, sy, 46, a.sunColor, 0.35);
-      this.disc(ctx, sx, sy, 7, rgb(a.sunColor));
-    }
-    // Луна.
-    if (a.moonH > -0.05) {
-      const mx = Math.round(w * 0.72);
-      const my = Math.round(horizonY - 8 - a.moonH * (horizonY - 40));
-      const r = a.bloodMoon ? 13 : 9;
-      this.glow(ctx, mx, my, a.bloodMoon ? 70 : 40, a.moonColor, a.bloodMoon ? 0.4 : 0.18);
-      this.disc(ctx, mx, my, r, rgb(a.moonColor));
-      // Кратеры.
-      ctx.fillStyle = a.bloodMoon ? 'rgba(90,10,10,0.45)' : 'rgba(150,150,140,0.45)';
-      ctx.fillRect(mx - 3, my - 2, 3, 2);
-      ctx.fillRect(mx + 2, my + 2, 2, 2);
-      ctx.fillRect(mx - 1, my + 4, 2, 1);
-      if (a.bloodMoon) {
-        ctx.fillRect(mx + 4, my - 5, 3, 2);
-        ctx.fillRect(mx - 7, my + 3, 2, 2);
+      // Падающие звёзды.
+      if (a.starAlpha > 0.6 && !a.bloodMoon && fxRng.chance(dt * 0.06)) {
+        const dir = fxRng.chance(0.5) ? -1 : 1;
+        this.meteors.push({ x: fxRng.range(0.15, 0.85) * w, y: fxRng.range(0.05, 0.35) * horizonY, vx: dir * fxRng.range(90, 150), vy: fxRng.range(35, 60), life: fxRng.range(0.5, 0.9) });
+      }
+      for (const m of this.meteors) {
+        const len = 7;
+        for (let k = 0; k < len; k++) {
+          const t = k / len;
+          ctx.fillStyle = `rgba(255,250,235,${(a.starAlpha * Math.min(1, m.life * 2) * (1 - t) * 0.9).toFixed(3)})`;
+          ctx.fillRect(Math.round(m.x - m.vx * t * 0.06), Math.round(m.y - m.vy * t * 0.06), 1, 1);
+        }
       }
     }
 
-    // Облака.
+    // Северное сияние зимними ночами.
+    if (a.aurora > 0.05) this.drawAurora(ctx, a, w, horizonY, time, camX);
+
+    // Солнце и зарево у горизонта на закате/рассвете.
+    if (a.sunH > -0.25) {
+      const sx = Math.round(w * a.sunX);
+      const sy = Math.round(horizonY - 8 - a.sunH * (horizonY - 34));
+      const low = 1 - Math.min(1, Math.max(0, a.sunH) / 0.35);
+      if (low > 0) this.glow(ctx, sx, horizonY - 6, 150, mix(a.sunColor, hex('#ff8a3a'), 0.5), 0.28 * low);
+      if (a.sunH > -0.05) {
+        this.glow(ctx, sx, sy, 46 + low * 20, a.sunColor, 0.35);
+        this.disc(ctx, sx, sy, 7 + Math.round(low * 2), rgb(a.sunColor));
+      }
+    }
+    // Луна с фазами (в Кровавую луну — всегда полная и огромная).
+    if (a.moonH > -0.05) {
+      const mx = Math.round(w * a.moonX);
+      const my = Math.round(horizonY - 8 - a.moonH * (horizonY - 40));
+      const r = a.bloodMoon ? 13 : 9;
+      const lit = a.bloodMoon ? 1 : (1 - Math.cos(a.moonPhase * Math.PI * 2)) / 2;
+      this.glow(ctx, mx, my, a.bloodMoon ? 70 : 26 + lit * 18, a.moonColor, (a.bloodMoon ? 0.4 : 0.18) * (0.3 + 0.7 * lit));
+      this.moon(ctx, mx, my, r, a);
+    }
+
+    // Облака: дальний слой бледнее и медленнее.
     this.recolorClouds(a);
     const cw = w + 300;
     for (const c of this.clouds) {
-      const x = ((((c.x - camX * 0.04) % 2400) + 2400) % 2400) - 150;
+      const par = c.layer ? 0.05 : 0.025;
+      const x = ((((c.x - camX * par) % 2600) + 2600) % 2600) - 180;
       if (x > cw) continue;
       const it = c.item;
-      ctx.drawImage(this.cloudColored, it.x, this.cloudColored.height - it.h, it.w, it.h, Math.round(x), Math.round(c.y * horizonY * 0.75), it.w, it.h);
+      if (!c.layer) ctx.globalAlpha = 0.72;
+      const y = Math.round(c.y * horizonY * (c.layer ? 0.7 : 0.8));
+      ctx.drawImage(this.cloudColored, it.x, this.cloudColored.height - it.h, it.w, it.h, Math.round(x), y, it.w, it.h);
+      ctx.globalAlpha = 1;
     }
+  }
+
+  private moon(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, a: Atmosphere): void {
+    const f = a.moonPhase;
+    const bright = rgb(a.moonColor);
+    const dark = a.bloodMoon ? 'rgba(90,10,10,0.9)' : 'rgba(60,70,100,0.35)';
+    for (let y = -r; y <= r; y++) {
+      const hw = Math.floor(Math.sqrt(r * r - y * y + r * 0.6));
+      // Терминатор: растущая луна освещена справа, убывающая — слева.
+      const k = Math.cos(f * Math.PI * 2) * hw;
+      let x0 = -hw;
+      let x1 = hw;
+      if (!a.bloodMoon) {
+        if (f < 0.5) x0 = Math.round(k);
+        else x1 = Math.round(-k);
+      }
+      ctx.fillStyle = dark;
+      ctx.fillRect(cx - hw, cy + y, hw * 2 + 1, 1);
+      if (x1 >= x0) {
+        ctx.fillStyle = bright;
+        ctx.fillRect(cx + x0, cy + y, x1 - x0 + 1, 1);
+      }
+    }
+    // Моря (кратеры) видны на освещённой части.
+    ctx.fillStyle = a.bloodMoon ? 'rgba(90,10,10,0.45)' : 'rgba(150,150,140,0.45)';
+    const spots: Array<[number, number, number, number]> = [
+      [-3, -2, 3, 2],
+      [2, 2, 2, 2],
+      [-1, 4, 2, 1],
+      [3, -4, 2, 1],
+    ];
+    const f2 = a.moonPhase;
+    for (const [x, y, ww, hh] of spots) {
+      const onLit = a.bloodMoon || (f2 < 0.5 ? x >= Math.cos(f2 * Math.PI * 2) * r : x <= -Math.cos(f2 * Math.PI * 2) * r);
+      if (onLit) ctx.fillRect(cx + x, cy + y, ww, hh);
+    }
+    if (a.bloodMoon) {
+      ctx.fillRect(cx + 4, cy - 5, 3, 2);
+      ctx.fillRect(cx - 7, cy + 3, 2, 2);
+    }
+  }
+
+  /** Северное сияние: занавесы света, рисуются в половинном разрешении. */
+  private drawAurora(ctx: CanvasRenderingContext2D, a: Atmosphere, w: number, horizonY: number, time: number, camX: number): void {
+    const hw = Math.ceil(w / 2);
+    const hh = Math.ceil(horizonY / 2);
+    if (!this.aurora || this.aurora[0].width !== hw || this.aurora[0].height !== hh) this.aurora = makeCanvas(hw, hh);
+    const [cv, c] = this.aurora;
+    if (time - this.auroraT > 0.1 || time < this.auroraT) {
+      this.auroraT = time;
+      c.clearRect(0, 0, hw, hh);
+      const shift = camX * 0.006;
+      for (let band = 0; band < 2; band++) {
+        for (let x = 0; x < hw; x++) {
+          const wx = x + shift * 40;
+          const top = hh * (0.18 + band * 0.14) + Math.sin(wx * 0.021 + time * 0.25 + band * 2) * 9 + Math.sin(wx * 0.057 - time * 0.4) * 4;
+          const len = 18 + 14 * Math.sin(wx * 0.013 + time * 0.2 + band) ** 2;
+          const ray = 0.45 + 0.55 * Math.sin(wx * 0.33 + time * 1.3 + band * 3) ** 2;
+          const k = ray * (0.55 + 0.45 * Math.sin(wx * 0.009 - time * 0.15 + band * 4));
+          for (let y = 0; y < len; y += 2) {
+            const t = y / len;
+            const alpha = k * (1 - t) * (t < 0.15 ? t / 0.15 : 1) * 0.85;
+            if (alpha < 0.03) continue;
+            c.fillStyle = t < 0.25 && band === 0 ? `rgba(170,110,230,${alpha.toFixed(3)})` : `rgba(90,255,160,${alpha.toFixed(3)})`;
+            c.fillRect(x, Math.round(top + y), 1, 2);
+          }
+        }
+      }
+    }
+    ctx.globalAlpha = Math.min(1, a.aurora);
+    ctx.globalCompositeOperation = 'lighter';
+    ctx.drawImage(cv, 0, 0, hw * 2, hh * 2);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.globalAlpha = 1;
   }
 
   private disc(ctx: CanvasRenderingContext2D, cx: number, cy: number, r: number, color: string): void {
