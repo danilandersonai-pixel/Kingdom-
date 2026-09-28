@@ -11,7 +11,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "shots": "node scripts/shots.mjs",
-    "build:artifact": "vite build && node scripts/artifact.mjs"
+    "build:artifact": "vite build && node scripts/artifact.mjs",
+    "build:itch": "vite build && node scripts/itch.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.63.0",

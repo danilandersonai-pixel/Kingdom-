@@ -80,7 +80,19 @@ npm test           # автотесты механик, регрессий и с
 npm run typecheck  # проверка типов
 npm run build      # сборка в один файл dist/index.html
 npm run build:artifact  # страница для публикации ссылкой: dist/korolevstvo.html
+npm run build:itch      # архив для itch.io: dist/korolevstvo-itch.zip
 ```
+
+### Как выложить игру
+
+Игра — один HTML-файл без внешних зависимостей, поэтому подойдёт любой хостинг статических страниц.
+
+- **itch.io:**
+  1. Выполните `npm run build:itch`.
+  2. Создайте проект с типом *HTML*.
+  3. Загрузите `dist/korolevstvo-itch.zip` и отметьте «This file will be played in the browser».
+  4. Размер окна — 960×540; включите кнопку полноэкранного режима и пометку *Mobile friendly*.
+- **GitHub Pages, Netlify и похожие:** выложите `dist/index.html` как главную страницу.
 
 Параметры адреса для отладки:
 
