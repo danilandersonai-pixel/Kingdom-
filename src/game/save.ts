@@ -12,7 +12,7 @@ import { Coin, DroppedTool } from './entities/pickups';
 import type { Entity } from './entity';
 import { TownCenter, Shop } from './structures/town';
 import { Wall, Tower } from './structures/defense';
-import { Tree, Stump, Rock, Camp, Chest, BerryBush } from './structures/nature';
+import { Tree, Stump, Rock, Camp, Chest, BerryBush, IslandEdge } from './structures/nature';
 import { Portal, type PortalKind } from './structures/portal';
 import { Farm, type FarmStage } from './structures/farm';
 import { MerchantHut, Merchant, Banker, GemKeeper } from './structures/economy';
@@ -44,6 +44,7 @@ function snapEntity(e: Entity): Rec | null {
   if (e instanceof Farm) return { cls: 'Farm', id, ...base(e), stage: e.stage, fields: e.fields.map((f) => f.progress) };
   if (e instanceof Tree) return { cls: 'Tree', id, x: e.x, kind: e.kind, variant: e.variant, height: e.height, marked: e.marked, bp: e.buildProgress };
   if (e instanceof Stump) return { cls: 'Stump', id, x: e.x };
+  if (e instanceof IslandEdge) return { cls: 'IslandEdge', id, x: e.x, side: e.side };
   if (e instanceof Rock) return { cls: 'Rock', id, x: e.x, variant: e.variant };
   if (e instanceof Camp) return { cls: 'Camp', id, x: e.x };
   if (e instanceof Chest) return { cls: 'Chest', id, x: e.x, gems: e.gems, amount: e.amount, opened: e.opened };
@@ -180,6 +181,9 @@ function restoreWorld(r: Rec, c: Campaign): World {
       }
       case 'Stump':
         ent = new Stump(e.x);
+        break;
+      case 'IslandEdge':
+        ent = new IslandEdge(e.x, e.side);
         break;
       case 'Rock':
         ent = new Rock(e.x, e.variant);

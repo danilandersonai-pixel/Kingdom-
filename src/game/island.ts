@@ -7,7 +7,7 @@ import { ISLANDS, M } from './config';
 import { attachTerrain } from './terrain';
 import { TownCenter } from './structures/town';
 import { Wall, Tower } from './structures/defense';
-import { Tree, Camp, Chest, Rock, BerryBush } from './structures/nature';
+import { Tree, Camp, Chest, Rock, BerryBush, IslandEdge } from './structures/nature';
 import { Portal } from './structures/portal';
 import { Person } from './entities/person';
 import { Coin } from './entities/pickups';
@@ -245,6 +245,8 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
       }
     }
   };
+  // Край острова со стороны моря.
+  w.addNow(new IslandEdge(beachSide * (L - 2 * M), beachSide));
   // Пристани и лодка.
   w.addNow(new CentralDock(centralDock, index));
   w.addNow(new FarDock(farDock));

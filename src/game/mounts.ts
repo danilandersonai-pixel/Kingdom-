@@ -35,7 +35,7 @@ export const MOUNTS: Record<MountId, MountDef> = {
   griffin: {
     id: 'griffin',
     name: 'Грифон',
-    look: { ...HORSE, body: '#c8a060', mane: '#f0ece0', socks: undefined, blaze: false, saddle: '#2a4a8a', saddleTrim: '#f2d870' },
+    look: { ...HORSE, body: '#c8a060', mane: '#f0ece0', socks: undefined, blaze: false, saddle: '#2a4a8a', saddleTrim: '#f2d870', kind: 'griffin' },
     walk: 2.4,
     run: 5.5,
     stamina: 20,
@@ -103,7 +103,7 @@ export const MOUNTS: Record<MountId, MountDef> = {
   bear: {
     id: 'bear',
     name: 'Медведь',
-    look: { ...HORSE, body: '#5a3e2a', mane: '#3a281a', socks: undefined, blaze: false, saddle: '#6a4a8a', saddleTrim: '#d0a030', scale: 1.12 },
+    look: { ...HORSE, body: '#5a3e2a', mane: '#3a281a', socks: undefined, blaze: false, saddle: '#6a4a8a', saddleTrim: '#d0a030', scale: 1.12, kind: 'bear' },
     walk: 2.5,
     run: 5.0,
     stamina: 8,
@@ -120,7 +120,7 @@ export const MOUNTS: Record<MountId, MountDef> = {
   lizard: {
     id: 'lizard',
     name: 'Ящер',
-    look: { ...HORSE, body: '#4a7a4a', mane: '#2a4a2a', socks: undefined, blaze: false, saddle: '#8a5a2a', saddleTrim: '#d0a030', scale: 1.1 },
+    look: { ...HORSE, body: '#4a7a4a', mane: '#2a4a2a', socks: undefined, blaze: false, saddle: '#8a5a2a', saddleTrim: '#d0a030', scale: 1.1, kind: 'lizard' },
     walk: 2.4,
     run: 5.2,
     stamina: 9,

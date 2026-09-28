@@ -21,6 +21,8 @@ export interface MountLook {
   saddleTrim: string;
   /** Масштаб корпуса (медведь крупнее). */
   scale?: number;
+  /** Особое телосложение. */
+  kind?: 'horse' | 'griffin' | 'bear' | 'lizard';
 }
 
 export interface RiderLook {
@@ -84,9 +86,9 @@ interface Leg {
   near: boolean;
 }
 
-function legPose(anim: MountAnim, t: number, leg: Leg): { kx: number; ky: number; fx: number; fy: number } {
-  const upper = 4.6;
-  const lower = 4.8;
+function legPose(anim: MountAnim, t: number, leg: Leg, k = 1): { kx: number; ky: number; fx: number; fy: number } {
+  const upper = 4.6 * k;
+  const lower = 4.8 * k;
   let a1 = 0;
   let bend = 0;
   let lift = 0;
@@ -135,7 +137,8 @@ export function drawMountFrame(ctx: CanvasRenderingContext2D, anim: MountAnim, t
     bob = Math.sin(t * Math.PI * 2) * 1.3 + 0.6;
     pitch = Math.cos(t * Math.PI * 2) * 0.9;
   } else if (anim === 'idle') bob = Math.sin(t * Math.PI * 2) * 0.25;
-  const by = (y: number, x: number) => y + bob + (x / 10) * pitch * 0.5;
+  const drop = m.kind === 'bear' ? 3 : m.kind === 'lizard' ? 3.5 : 0;
+  const by = (y: number, x: number) => y + bob + (x / 10) * pitch * 0.5 - drop;
 
   const legs: Leg[] =
     anim === 'gallop'
@@ -152,15 +155,17 @@ export function drawMountFrame(ctx: CanvasRenderingContext2D, anim: MountAnim, t
           { hipX: 6.5, hipY: 10.2, phase: 0.75, front: true, near: true },
         ];
 
-  const drawLeg = (leg: Leg) => {
-    const p = legPose(anim, t, leg);
+  const drawLeg = (leg0: Leg) => {
+    const leg = drop ? { ...leg0, hipY: leg0.hipY - drop } : leg0;
+    const p = legPose(anim, t, leg, drop ? (leg0.hipY - drop) / leg0.hipY : 1);
     const hipY = by(leg.hipY, leg.hipX);
     const ky = p.ky + (hipY - leg.hipY);
     const fy = Math.max(0, p.fy + (hipY - leg.hipY) * 0.4);
     const col = leg.near ? dark : farBody;
     const hx = X(leg.hipX);
-    limb(ctx, hx, Y(hipY + 1.2), X(p.kx), Y(ky), leg.front ? 2.6 * S : 3.2 * S, 1.8 * S, col);
-    limb(ctx, X(p.kx), Y(ky), X(p.fx), Y(fy + 1), 1.6 * S, 1.4 * S, col);
+    const thick = m.kind === 'bear' ? 1.6 : 1;
+    limb(ctx, hx, Y(hipY + 1.2), X(p.kx), Y(ky), (leg.front ? 2.6 : 3.2) * S * thick, 1.8 * S * thick, col);
+    limb(ctx, X(p.kx), Y(ky), X(p.fx), Y(fy + 1), 1.6 * S * thick, 1.4 * S * thick, col);
     if (m.socks && leg.near) line(ctx, X(p.fx), Y(fy + 1.8), X(p.fx), Y(fy + 1), m.socks);
     rect(ctx, X(p.fx) - 1, Y(fy + 0.6), 2 * S, 1, m.hoof);
   };
@@ -175,13 +180,27 @@ export function drawMountFrame(ctx: CanvasRenderingContext2D, anim: MountAnim, t
   // Хвост.
   const sway = anim === 'gallop' ? Math.sin(t * Math.PI * 2) * 1.5 + 2 : anim === 'walk' ? Math.sin(t * Math.PI * 2) * 0.8 : Math.sin(t * Math.PI * 2) * 0.6;
   const tailLift = anim === 'gallop' ? 3.5 : 0;
-  const tMidX = -12.6 - sway * 0.35;
-  const tMidY = by(13.2 + tailLift * 0.6, -12);
-  const tTipX = -12.2 - sway - (anim === 'gallop' ? 3 : 0);
-  const tTipY = by(5.5 + tailLift * 1.4, -12);
-  limb(ctx, X(-10.2), Y(by(16.4, -10)), X(tMidX), Y(tMidY), 2.8 * S, 2.6 * S, m.mane);
-  limb(ctx, X(tMidX), Y(tMidY), X(tTipX), Y(tTipY), 2.6 * S, 1.2 * S, m.mane);
-  line(ctx, X(-10.6), Y(by(16, -10)), X(tMidX + 0.6), Y(tMidY - 1), shade(m.mane, 1.5));
+  const kind = m.kind ?? 'horse';
+  if (kind === 'lizard') {
+    // Длинный хвост ящера почти до земли.
+    limb(ctx, X(-9), Y(by(13, -9)), X(-15 - sway * 0.3), Y(by(8, -15)), 4 * S, 3 * S, body);
+    limb(ctx, X(-15 - sway * 0.3), Y(by(8, -15)), X(-21 - sway), Y(3), 3 * S, 1.2 * S, body);
+    line(ctx, X(-9), Y(by(11, -9)), X(-20 - sway), Y(3), dark);
+  } else if (kind === 'bear') {
+    ellipse(ctx, X(-10), Y(by(14, -10)), 1.5 * S, 1.5 * S, dark);
+  } else if (kind === 'griffin') {
+    // Львиный хвост с кисточкой.
+    limb(ctx, X(-10), Y(by(15, -10)), X(-14 - sway * 0.4), Y(by(10 + tailLift, -14)), 1.4 * S, 1.2 * S, body);
+    ellipse(ctx, X(-14.5 - sway * 0.4), Y(by(9 + tailLift, -14)), 1.6, 1.6, m.mane);
+  } else {
+    const tMidX = -12.6 - sway * 0.35;
+    const tMidY = by(13.2 + tailLift * 0.6, -12);
+    const tTipX = -12.2 - sway - (anim === 'gallop' ? 3 : 0);
+    const tTipY = by(5.5 + tailLift * 1.4, -12);
+    limb(ctx, X(-10.2), Y(by(16.4, -10)), X(tMidX), Y(tMidY), 2.8 * S, 2.6 * S, m.mane);
+    limb(ctx, X(tMidX), Y(tMidY), X(tTipX), Y(tTipY), 2.6 * S, 1.2 * S, m.mane);
+    line(ctx, X(-10.6), Y(by(16, -10)), X(tMidX + 0.6), Y(tMidY - 1), shade(m.mane, 1.5));
+  }
 
   // Корпус: круп, бочка, грудь.
   ellipse(ctx, X(-6.8), Y(by(13.4, -7)), 4.3 * S, 4.3 * S, body);
@@ -205,19 +224,45 @@ export function drawMountFrame(ctx: CanvasRenderingContext2D, anim: MountAnim, t
   const neckBase: [number, number] = [7.2, by(15.2, 7)];
   const headTop: [number, number] = eat ? [12, by(8, 12)] : [11.4, by(22.3, 11) + headBob];
   const muzzle: [number, number] = eat ? [13.5, 1.8 + chew] : [16.6, by(18.2, 16) + headBob];
-  limb(ctx, X(neckBase[0]), Y(neckBase[1]), X(headTop[0]), Y(headTop[1] - 1), 5.2 * S, 3.2 * S, body);
-  // Грива вдоль шеи.
-  limb(ctx, X(neckBase[0] - 1.8), Y(neckBase[1] + 2.2), X(headTop[0] - 0.8), Y(headTop[1] + 0.8), 1.8 * S, 1.4 * S, m.mane);
-  // Голова.
-  limb(ctx, X(headTop[0]), Y(headTop[1]), X(muzzle[0]), Y(muzzle[1]), 3.6 * S, 2.4 * S, body);
-  px(ctx, X(muzzle[0]), Y(muzzle[1] - 0.5), dark);
-  // Ухо.
-  poly(ctx, [[X(headTop[0] - 0.8), Y(headTop[1] + 1)], [X(headTop[0] + 0.4), Y(headTop[1] + 3)], [X(headTop[0] + 1.1), Y(headTop[1] + 0.8)]], body);
-  if (m.blaze) line(ctx, X(headTop[0] + 1.6), Y(headTop[1] - 0.6), X(muzzle[0] - 0.8), Y(muzzle[1] + 0.2), '#efe6d6');
-  // Глаз.
-  const ex = eat ? headTop[0] + 0.6 : headTop[0] + 1.3;
-  const ey = eat ? headTop[1] - 1.5 : headTop[1] - 1;
-  px(ctx, X(ex), Y(ey), '#140c0a');
+  if (kind === 'bear') {
+    // Короткая толстая шея, круглая голова, круглые уши, короткая морда.
+    limb(ctx, X(neckBase[0]), Y(neckBase[1]), X(headTop[0] - 1), Y(headTop[1] - 3), 6 * S, 5 * S, body);
+    ellipse(ctx, X(headTop[0]), Y(headTop[1] - 3), 3.4 * S, 3 * S, body);
+    ellipse(ctx, X(headTop[0] - 1.5), Y(headTop[1] - 0.2), 1.2, 1.2, dark);
+    limb(ctx, X(headTop[0] + 2), Y(headTop[1] - 4), X(headTop[0] + 5), Y(headTop[1] - 5), 2.4, 2, light);
+    px(ctx, X(headTop[0] + 5), Y(headTop[1] - 4.6), '#140c0a');
+    px(ctx, X(headTop[0] + 1.5), Y(headTop[1] - 2.5), '#140c0a');
+  } else if (kind === 'lizard') {
+    // Длинная плоская голова без ушей и гривы, гребень на спине.
+    limb(ctx, X(neckBase[0]), Y(neckBase[1]), X(headTop[0]), Y(headTop[1] - 3), 4.4 * S, 3.4 * S, body);
+    limb(ctx, X(headTop[0] - 1), Y(headTop[1] - 3), X(muzzle[0] + 1.5), Y(muzzle[1] - 1), 3.4 * S, 2.2 * S, body);
+    line(ctx, X(headTop[0] + 1), Y(headTop[1] - 4.6), X(muzzle[0] + 1.5), Y(muzzle[1] - 1.5), dark);
+    px(ctx, X(headTop[0] + 1.5), Y(headTop[1] - 2.6), '#f2d040');
+    for (let x = -8; x <= 6; x += 2) px(ctx, X(x), Y(by(17.6, x)), light);
+  } else if (kind === 'griffin') {
+    // Орлиная голова с клювом, перья на шее, сложенное крыло на боку.
+    limb(ctx, X(neckBase[0]), Y(neckBase[1]), X(headTop[0]), Y(headTop[1] - 1), 5 * S, 3.6 * S, m.mane);
+    ellipse(ctx, X(headTop[0] + 1), Y(headTop[1] - 1.5), 2.8, 2.6, m.mane);
+    poly(ctx, [[X(headTop[0] + 3), Y(headTop[1] - 1)], [X(headTop[0] + 6.5), Y(headTop[1] - 2.5)], [X(headTop[0] + 5), Y(headTop[1] - 4)], [X(headTop[0] + 3), Y(headTop[1] - 3)]], '#e0b030');
+    px(ctx, X(headTop[0] + 2), Y(headTop[1] - 0.6), '#140c0a');
+    px(ctx, X(headTop[0] - 1), Y(headTop[1] + 1.5), m.mane);
+    poly(ctx, [[X(6), Y(by(16, 6))], [X(-8), Y(by(18.5, -8))], [X(-12), Y(by(13, -12))], [X(-4), Y(by(11.5, -4))]], shade(body, 0.85));
+    for (let i = 0; i < 4; i++) line(ctx, X(-4 - i * 2), Y(by(17.5 - i * 0.4, -4)), X(-6 - i * 2), Y(by(12.5, -6)), shade(body, 0.65));
+  } else {
+    limb(ctx, X(neckBase[0]), Y(neckBase[1]), X(headTop[0]), Y(headTop[1] - 1), 5.2 * S, 3.2 * S, body);
+    // Грива вдоль шеи.
+    limb(ctx, X(neckBase[0] - 1.8), Y(neckBase[1] + 2.2), X(headTop[0] - 0.8), Y(headTop[1] + 0.8), 1.8 * S, 1.4 * S, m.mane);
+    // Голова.
+    limb(ctx, X(headTop[0]), Y(headTop[1]), X(muzzle[0]), Y(muzzle[1]), 3.6 * S, 2.4 * S, body);
+    px(ctx, X(muzzle[0]), Y(muzzle[1] - 0.5), dark);
+    // Ухо.
+    poly(ctx, [[X(headTop[0] - 0.8), Y(headTop[1] + 1)], [X(headTop[0] + 0.4), Y(headTop[1] + 3)], [X(headTop[0] + 1.1), Y(headTop[1] + 0.8)]], body);
+    if (m.blaze) line(ctx, X(headTop[0] + 1.6), Y(headTop[1] - 0.6), X(muzzle[0] - 0.8), Y(muzzle[1] + 0.2), '#efe6d6');
+    // Глаз.
+    const ex = eat ? headTop[0] + 0.6 : headTop[0] + 1.3;
+    const ey = eat ? headTop[1] - 1.5 : headTop[1] - 1;
+    px(ctx, X(ex), Y(ey), '#140c0a');
+  }
   if (m.antlers) {
     const ax = X(headTop[0] - 0.2);
     const ay = Y(headTop[1] + 1.5);

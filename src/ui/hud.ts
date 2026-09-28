@@ -21,7 +21,7 @@ export class Hud {
 
   update(dt: number, m: Monarch | null): void {
     this.dayBanner.t += dt;
-    const want = m && (m.purseFlash > 0 || (m.input?.dropping ?? false) || m.hoverTarget) ? 1 : 0;
+    const want = m && (m.purseFlash > 0 || (m.input?.dropping ?? false) || m.payTarget) ? 1 : 0;
     this.purseAlpha = clamp(this.purseAlpha + (want ? dt * 5 : -dt * 1.5), 0, 1);
   }
 

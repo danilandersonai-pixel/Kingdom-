@@ -8,7 +8,8 @@ import type { Light } from '../../render/lighting';
 import { blit, hex, makeCanvas, type Sprite } from '../../engine/sprite';
 import { makeTree, masksToColor, makeBush, type TreeKind } from '../../render/treegen';
 import { Rng, fxRng } from '../../engine/rng';
-import { campSprite, chestSprite, stumpSprite, rockSprite } from '../../art/buildings';
+import { campSprite, chestSprite, stumpSprite, rockSprite, beachSprite } from '../../art/buildings';
+import { rgb, mix, hex as hexColor } from '../../engine/sprite';
 import { PRICES, WORK, M, PEOPLE } from '../config';
 import { Coin } from '../entities/pickups';
 import type { Season } from '../../render/atmosphere';
@@ -404,3 +405,36 @@ export function bushDecor(seed: number): Sprite {
 }
 
 void PEOPLE;
+
+/** Край острова со стороны моря: песчаный пляж и открытая вода за ним. */
+export class IslandEdge extends Structure {
+  readonly type = 'rock' as const;
+  side: -1 | 1;
+  constructor(x: number, side: -1 | 1) {
+    super();
+    this.x = x;
+    this.side = side;
+    this.z = 1;
+  }
+  get drawRadius(): number {
+    return 400;
+  }
+  override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
+    const a = r.atmos;
+    const edgeX = r.sx(this.x);
+    const gy = r.sy(0);
+    // Вода вместо полосы земли за краем острова.
+    const water = a ? mix(a.waterDeep, a.skyHorizon, 0.25) : hexColor('#3a6a80');
+    ctx.fillStyle = rgb(water);
+    if (this.side > 0) ctx.fillRect(edgeX, gy - 4, r.w - edgeX + 4, 20);
+    else ctx.fillRect(-4, gy - 4, edgeX + 4, 20);
+    ctx.fillStyle = rgb(mix(water, hexColor('#ffffff'), 0.35));
+    const t = this.world.clock;
+    for (let i = 0; i < 8; i++) {
+      const wx = this.side > 0 ? edgeX + 10 + i * 30 + Math.sin(t + i) * 4 : edgeX - 10 - i * 30 - Math.sin(t + i) * 4;
+      ctx.fillRect(Math.round(wx), gy - 3 + (i % 3), 6, 1);
+    }
+    const b = beachSprite(this.side);
+    ctx.drawImage(b.img, this.side > 0 ? edgeX - b.w : edgeX, gy - 4);
+  }
+}

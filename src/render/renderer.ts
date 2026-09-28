@@ -31,6 +31,8 @@ export class Renderer {
   readonly weather = new Weather();
   readonly ripples: Ripple[] = [];
   lights: Light[] = [];
+  /** Атмосфера последнего кадра (для объектов, которые рисуют воду сами). */
+  atmos: Atmosphere | null = null;
 
   camX = 0;
   shake = 0;
@@ -122,6 +124,7 @@ export class Renderer {
     const ctx = this.screen.ctx;
     const { w, h } = this.screen;
     const camX = this.camX + this.shakeX;
+    this.atmos = a;
     ctx.globalCompositeOperation = 'source-over';
     ctx.globalAlpha = 1;
     ctx.imageSmoothingEnabled = false;

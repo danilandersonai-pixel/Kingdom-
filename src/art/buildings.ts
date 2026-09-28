@@ -381,19 +381,23 @@ export function millSprite(): Sprite {
 
 // ——— Лагерь бродяг ———
 export function campSprite(): Sprite {
-  return build('camp', 30, 14, (ctx, w, h) => {
-    poly(ctx, [[2, h], [16, h], [9, h - 12]], '#6a5e4e');
-    poly(ctx, [[9, h - 12], [16, h], [12, h]], '#4e4438');
-    line(ctx, 9, h - 12, 9, h - 13, WOOD);
-    rect(ctx, 8, h - 4, 2, 4, '#2a2018');
-    // Заплатки.
-    rect(ctx, 5, h - 5, 2, 2, '#7a6a4a');
-    rect(ctx, 12, h - 7, 1, 2, '#5a6a5a');
-    // Кострище.
-    line(ctx, 20, h - 1, 26, h - 2, WOOD_D);
-    line(ctx, 20, h - 2, 26, h - 1, WOOD);
-    px(ctx, 19, h - 1, '#7a7a80');
-    px(ctx, 27, h - 1, '#7a7a80');
+  return build('camp', 32, 18, (ctx, w, h) => {
+    // Латаная палатка из светлой ткани.
+    poly(ctx, [[1, h], [19, h], [10, h - 15]], '#a8987a');
+    poly(ctx, [[10, h - 15], [19, h], [14, h]], '#7a6a54');
+    line(ctx, 10, h - 15, 10, h - 17, WOOD);
+    line(ctx, 10, h - 15, 1, h - 1, '#c8b898');
+    rect(ctx, 9, h - 6, 3, 6, '#2a2018');
+    rect(ctx, 4, h - 6, 3, 3, '#8a6a4a');
+    rect(ctx, 13, h - 9, 2, 3, '#6a7a6a');
+    rect(ctx, 15, h - 4, 2, 2, '#9a5a4a');
+    // Котелок на палке и кострище.
+    line(ctx, 22, h - 1, 28, h - 2, WOOD_D);
+    line(ctx, 22, h - 2, 28, h - 1, WOOD);
+    px(ctx, 21, h - 1, '#7a7a80');
+    px(ctx, 29, h - 1, '#7a7a80');
+    line(ctx, 21, h - 9, 29, h - 9, WOOD_D);
+    rect(ctx, 24, h - 8, 3, 2, '#3a3a40');
     void w;
   });
 }
@@ -483,10 +487,31 @@ export function cliffSprite(side: -1 | 1): Sprite {
 
 // ——— Пристань и лодка ———
 export function dockSprite(): Sprite {
-  return build('dock', 50, 14, (ctx, w, h) => {
-    rect(ctx, 0, h - 10, w, 2, WOOD_L);
-    for (let x = 0; x < w; x += 4) px(ctx, x, h - 10, WOOD_D);
-    for (let x = 2; x < w; x += 12) rect(ctx, x, h - 8, 2, 8, WOOD_D);
+  return build('dock', 56, 20, (ctx, w, h) => {
+    // Настил пристани на сваях, уходящих в воду.
+    rect(ctx, 0, h - 16, w, 3, WOOD_L);
+    rect(ctx, 0, h - 13, w, 1, WOOD_D);
+    for (let x = 0; x < w; x += 4) px(ctx, x, h - 16, WOOD_D);
+    for (let x = 3; x < w; x += 11) {
+      rect(ctx, x, h - 13, 2, 13, WOOD_D);
+      px(ctx, x, h - 13, WOOD);
+    }
+    // Швартовочные тумбы и верёвка.
+    rect(ctx, 2, h - 20, 2, 4, WOOD_D);
+    rect(ctx, w - 4, h - 20, 2, 4, WOOD_D);
+    line(ctx, 4, h - 19, w - 4, h - 19, ROPE);
+  });
+}
+
+/** Песчаный пляж на краю острова. */
+export function beachSprite(side: -1 | 1): Sprite {
+  return build(`beach:${side}`, 90, 14, (ctx, w, h) => {
+    for (let x = 0; x < w; x++) {
+      const t = side > 0 ? x / w : 1 - x / w;
+      const top = Math.round(3 + t * 9);
+      rect(ctx, x, top, 1, h - top, (x * 13) % 7 === 0 ? '#c8b088' : '#d8c098');
+      if (t > 0.85) rect(ctx, x, top, 1, 1, '#e8f0f0');
+    }
   });
 }
 
@@ -494,9 +519,13 @@ export function boatSprite(stage: number): Sprite {
   return build(`boat:${stage}`, 80, 70, (ctx, w, h) => {
     const hullTop = h - 16;
     if (stage === 0) {
-      // Разбитый остов.
-      poly(ctx, [[10, h - 2], [60, h - 2], [66, h - 12], [14, h - 9]], '#4a3424');
-      for (let x = 16; x < 62; x += 6) line(ctx, x, h - 10, x - 2, h - 18, WOOD_D);
+      // Разбитый остов, лежащий на боку: рёбра шпангоутов и обломок мачты.
+      poly(ctx, [[6, h - 1], [66, h - 1], [72, h - 14], [58, h - 20], [12, h - 12]], '#4a3424');
+      poly(ctx, [[10, h - 3], [62, h - 3], [66, h - 12], [14, h - 10]], '#5a4030');
+      for (let x = 14; x < 64; x += 5) line(ctx, x, h - 11, x - 3, h - 26 + ((x * 7) % 6), WOOD_L);
+      line(ctx, 40, h - 14, 58, h - 38, WOOD_D);
+      line(ctx, 41, h - 14, 59, h - 38, WOOD);
+      poly(ctx, [[58, h - 38], [66, h - 30], [52, h - 26]], '#b8b0a0');
       return;
     }
     // Корпус.

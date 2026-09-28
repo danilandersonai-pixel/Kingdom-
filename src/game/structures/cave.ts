@@ -186,6 +186,9 @@ export class Nest extends Structure {
     }
   }
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
+    // Гнёзда — внутри пещеры: видны, только когда туда идёт бомба.
+    const marching = this.world.all<Structure>('structure').some((s) => (s as Bomb).isBomb && (s as Bomb).stage !== 'ready');
+    if (!marching) return;
     blit(ctx, nestSprite(), r.sx(this.x), r.sy(0));
   }
 }
