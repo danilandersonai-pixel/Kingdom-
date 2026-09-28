@@ -149,6 +149,7 @@ export class App {
       m.input = this.input.players[i];
     });
     this.renderer.setIsland(world.island.seed, world.time.season);
+    this.renderer.ground.terrain = world.terrain;
     const r = this.renderer;
     world.fx = {
       particles: r.particles,

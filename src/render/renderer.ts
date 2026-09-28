@@ -179,7 +179,7 @@ export class Renderer {
     wctx.globalCompositeOperation = 'source-over';
     wctx.globalAlpha = 1;
     wctx.clearRect(0, 0, w, h);
-    this.ground.draw(wctx, camX, w, this.groundY);
+    this.ground.draw(wctx, camX, w, this.groundY, time);
     cb.world(wctx);
     this.particles.draw(wctx, camX, w, this.groundY, false);
     this.lighting.apply(wctx, this.lights, a, camX, this.groundY, w, h, time);
@@ -192,6 +192,7 @@ export class Renderer {
     this.sceneCtx.clearRect(0, 0, w, this.waterTop);
     this.sceneCtx.drawImage(this.screen.buffer, 0, 0, w, this.waterTop, 0, 0, w, this.waterTop);
     drawWater(ctx, this.sceneCopy, this.waterTop, w, h, time, a, camX, this.ripples, this.frozen);
+    this.ground.drawReeds(ctx, camX, w, this.waterTop, time);
     cb.water?.(ctx);
 
     this.weather.draw(ctx, nightFactor(phase));
