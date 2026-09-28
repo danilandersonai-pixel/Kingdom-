@@ -79,7 +79,8 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
 
   // ——— Пристани ———
   const centralDock = beachSide * 27 * M;
-  const farDock = beachSide * (L - 6 * M);
+  // Дальний причал выдаётся в море: сваи стоят в воде за кромкой пляжа.
+  const farDock = beachSide * (L - 3 * M);
 
   // ——— Места под стены и башни ———
   const wallSpots: number[] = [];
@@ -155,7 +156,16 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
 
   // ——— Лагеря бродяг (только в лесу) ———
   const campXs: number[] = [];
-  if (index === 1) campXs.push(36 * M);
+  // На первом острове лагерь близко к городу — но не на месте стены или башни.
+  if (index === 1) {
+    for (let k = 0; k < 40; k++) {
+      const d = 36 + (k % 2 ? 1 : -1) * Math.ceil(k / 2);
+      if (free(d * M, 4 * M)) {
+        campXs.push(d * M);
+        break;
+      }
+    }
+  }
   let tries = 0;
   while (campXs.length < cfg.camps && tries++ < 200) {
     const side = rng.sign();

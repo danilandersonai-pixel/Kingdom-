@@ -476,13 +476,43 @@ export function boatSprite(stage: number): Sprite {
   return build(`boat:${stage}`, 80, 70, (ctx, w, h) => {
     const hullTop = h - 16;
     if (stage === 0) {
-      // Разбитый остов, лежащий на боку: рёбра шпангоутов и обломок мачты.
-      poly(ctx, [[6, h - 1], [66, h - 1], [72, h - 14], [58, h - 20], [12, h - 12]], '#4a3424');
-      poly(ctx, [[10, h - 3], [62, h - 3], [66, h - 12], [14, h - 10]], '#5a4030');
-      for (let x = 14; x < 64; x += 5) line(ctx, x, h - 11, x - 3, h - 26 + ((x * 7) % 6), WOOD_L);
-      line(ctx, 40, h - 14, 58, h - 38, WOOD_D);
-      line(ctx, 41, h - 14, 59, h - 38, WOOD);
-      poly(ctx, [[58, h - 38], [66, h - 30], [52, h - 26]], '#b8b0a0');
+      // Разбитый остов, завалившийся на борт: изогнутый киль с задранным носом,
+      // остатки обшивки, несколько гнутых шпангоутов и упавшая мачта с парусом.
+      const keel = (x: number) => h - 2 - Math.round(Math.pow(Math.max(0, (x - 44) / 26), 2) * 14);
+      // Обшивка днища: доски вдоль киля, светлее к верхней кромке.
+      for (let x = 8; x < 70; x++) {
+        const k = keel(x);
+        const hh = Math.round(7 + Math.sin(((x - 8) / 62) * Math.PI) * 4);
+        for (let y = k - hh; y <= k; y++) {
+          const plank = (y - (k - hh)) % 3 === 0;
+          px(ctx, x, y, plank ? '#3a2818' : y < k - hh + 2 ? '#6a4c32' : '#523a26');
+        }
+        // Проломы в обшивке.
+        if (x > 22 && x < 30) for (let y = k - hh + 1; y < k - 3; y++) px(ctx, x, y, '#1e140c');
+      }
+      // Киль — тёмная толстая линия.
+      for (let x = 6; x < 72; x++) {
+        px(ctx, x, keel(x), '#2a1c10');
+        px(ctx, x, keel(x) - 1, '#3a2818');
+      }
+      // Гнутые шпангоуты: дуги от киля вверх и назад.
+      for (const [x0, len] of [[16, 15], [34, 19], [50, 17], [62, 12]] as Array<[number, number]>) {
+        const k = keel(x0) - 6;
+        for (let t = 0; t <= len; t++) {
+          const a = (t / len) * (Math.PI / 2.2);
+          const x = Math.round(x0 - Math.sin(a) * len * 0.35);
+          const y = Math.round(k - Math.sin(a + 0.2) * len);
+          px(ctx, x, y, WOOD_L);
+          px(ctx, x + 1, y, WOOD_D);
+        }
+      }
+      // Упавшая мачта и клок паруса.
+      line(ctx, 30, h - 4, 58, h - 30, WOOD_D);
+      line(ctx, 31, h - 4, 59, h - 30, WOOD);
+      poly(ctx, [[58, h - 30], [66, h - 23], [52, h - 19]], '#b8b0a0');
+      poly(ctx, [[58, h - 30], [60, h - 26], [55, h - 22]], '#8a8478');
+      // Водоросли и песок у борта.
+      for (let x = 8; x < 70; x += 3) px(ctx, x, h - 1, x % 2 ? '#4a5a3a' : '#c8b490');
       return;
     }
     // Корпус.

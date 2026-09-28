@@ -79,7 +79,13 @@ export class Critter extends Entity {
     }
     if (this.fleeing > 0) {
       this.fleeing -= dt;
-      if (this.flier) {
+      if (this.kind === 'butterfly') {
+        // Бабочка не взмывает в кроны, а отпархивает в сторону низко над травой.
+        this.state = 'fly';
+        this.x += this.facing * 18 * dt;
+        this.y = Math.min(16, this.y + Math.sin(this.anim * 9) * 12 * dt + 4 * dt);
+        if (this.fleeing <= 0) this.dead = true;
+      } else if (this.flier) {
         // Взлёт и прочь: вверх и в сторону от всадника.
         this.state = 'fly';
         this.x += this.facing * 42 * dt;
@@ -260,7 +266,8 @@ export function installCritters(w: World): void {
           crowCd = fxRng.range(20, 45);
         }
       }
-      if (day && (season === 'spring' || season === 'summer')) {
+      // Бабочки — в погожий день; в дождь прячутся.
+      if (day && !w.weatherWet && (season === 'spring' || season === 'summer')) {
         const t2 = w.terrain;
         for (const off of [-150, 60, 190]) {
           const x = Math.round((cam + off) / 60) * 60;

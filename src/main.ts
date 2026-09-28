@@ -9,6 +9,8 @@ import { mountFrames } from './art/horse';
 import { Screen } from './engine/screen';
 import { treeGallery, townGallery, defenseGallery, peopleGallery } from './debug/gallery';
 const qs = new URLSearchParams(location.search);
+// Галереи спрайтов для отладки — без заставки загрузки.
+if (qs.has('scene')) document.getElementById('boot')?.remove();
 if (qs.get('scene') === 'mounts') {
   const scr = new Screen(canvas);
   const d = scr.displayContext;

@@ -26,6 +26,9 @@ export interface Atmosphere {
   /** Затемнение объектов мира (ночь). */
   overlay: RGB;
   overlayAlpha: number;
+  /** Цветокоррекция мира: отсвет заката, багрянец Кровавой луны, серость ненастья. */
+  grade: RGB;
+  gradeAlpha: number;
   /** Сила источников света (0 днём, 1 ночью). */
   glow: number;
   starAlpha: number;
@@ -213,6 +216,20 @@ export function computeAtmosphere(inp: AtmosphereInput): Atmosphere {
   const sunH = sunHeight(inp.phase);
   const moonH = moonHeight(inp.phase);
 
+  // Низкое солнце окрашивает мир в цвет неба; ночью это уже делает затемнение.
+  const sunLow = sunH > -0.15 ? 1 - smoothstep(0.06, 0.42, sunH) : 0;
+  let grade: RGB = mix(k.hor, k.mid, 0.35);
+  let gradeAlpha = 0.3 * sunLow * (1 - night * 0.85);
+  const bloodK = clamp(inp.blood * night, 0, 1);
+  if (bloodK > 0) {
+    grade = mix(grade, hex('#b02818'), bloodK);
+    gradeAlpha = Math.max(gradeAlpha, 0.36 * bloodK);
+  }
+  if (oc > 0) {
+    grade = mix(grade, hex('#78808a'), oc * 0.7);
+    gradeAlpha = Math.max(gradeAlpha, 0.16 * oc * (1 - night));
+  }
+
   return {
     skyTop: k.top,
     skyMid: k.mid,
@@ -224,6 +241,8 @@ export function computeAtmosphere(inp: AtmosphereInput): Atmosphere {
     cloudShade: mix(k.cloud, k.top, 0.35),
     overlay: k.overlay,
     overlayAlpha: k.overlayAlpha,
+    grade,
+    gradeAlpha,
     glow: k.glow,
     starAlpha: k.stars * (1 - oc * 0.9),
     sunH,

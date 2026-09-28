@@ -79,15 +79,8 @@ export class Menu {
         drawText(ctx, '>', left + 4, y, { color: '#f2c84a' });
         drawText(ctx, '<', left + w - 8, y, { color: '#f2c84a' });
       }
-      drawText(ctx, text, cx, y, { align: 'center', color: dis ? '#948a78' : sel ? '#fff4d8' : '#e0d4b8', shadow: dis ? null : undefined });
-      // Недоступный пункт перечёркнут тонкой линией — видно, что он есть, но закрыт.
-      if (dis) {
-        const tw = textWidth(text);
-        ctx.fillStyle = '#948a78';
-        ctx.globalAlpha = 0.6;
-        ctx.fillRect(Math.round(cx - tw / 2) - 2, y + 3, tw + 4, 1);
-        ctx.globalAlpha = 1;
-      }
+      // Недоступный пункт — приглушён, но читается.
+      drawText(ctx, text, cx, y, { align: 'center', color: dis ? '#8a8272' : sel ? '#fff4d8' : '#e0d4b8', shadow: dis ? null : undefined });
     });
   }
 }

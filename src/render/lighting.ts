@@ -63,7 +63,7 @@ export class Lighting {
     for (const [l, sx, sy, r, k] of lit) {
       const rr = r * 0.75;
       const g = d.createRadialGradient(sx, sy, 0, sx, sy, rr);
-      g.addColorStop(0, rgb(l.color, 0.2 * k));
+      g.addColorStop(0, rgb(l.color, 0.14 * k));
       g.addColorStop(1, rgb(l.color, 0));
       d.fillStyle = g;
       d.fillRect(sx - rr, sy - rr, rr * 2, rr * 2);
@@ -93,7 +93,8 @@ export class Lighting {
       const sy = groundY - l.y;
       const fl = l.flicker ? 1 + Math.sin(time * 11 + l.x) * 0.12 * l.flicker : 1;
       const r = l.radius * 0.8 * fl;
-      const k = Math.min(0.5, 0.2 * l.intensity * a.glow * fl);
+      // Ореол мягкий: несколько огней рядом (костёр, факелы) не выжигают фигуры в сплошной цвет.
+      const k = Math.min(0.2, 0.11 * l.intensity * a.glow * fl);
       const g = ctx.createRadialGradient(sx, sy, 0, sx, sy, r);
       g.addColorStop(0, rgb(l.color, k));
       g.addColorStop(1, rgb(l.color, 0));

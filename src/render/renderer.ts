@@ -41,6 +41,8 @@ export class Renderer {
   rays = 0;
   /** Кувшинки на воде (весна и лето). */
   lilies = false;
+  /** Кромка острова со стороны моря (мировой X и сторона): за ней фон — открытое море. */
+  shore: { x: number; side: -1 | 1 } | null = null;
   /** Вспышка молнии 0..1 и сама молния (точки зигзага в экранных координатах). */
   flash = 0;
   private bolt: Array<[number, number]> = [];
@@ -194,6 +196,15 @@ export class Renderer {
     ctx.globalCompositeOperation = 'source-over';
   }
 
+  /** Цветокоррекция слоя (только там, где есть пиксели): мир принимает тон неба. */
+  private grade(c: CanvasRenderingContext2D, a: Atmosphere, y: number, hh: number): void {
+    if (a.gradeAlpha < 0.01) return;
+    c.globalCompositeOperation = 'source-atop';
+    c.fillStyle = rgb(a.grade, a.gradeAlpha);
+    c.fillRect(0, y, this.screen.w, hh);
+    c.globalCompositeOperation = 'source-over';
+  }
+
   render(a: Atmosphere, phase: number, time: number, cb: FrameCallbacks): void {
     const ctx = this.screen.ctx;
     const { w, h } = this.screen;
@@ -215,7 +226,7 @@ export class Renderer {
         for (let k = 0; k <= n; k++) ctx.fillRect(Math.round(x0 + ((x1 - x0) * k) / n), Math.round(y0 + ((y1 - y0) * k) / n), 1, 1);
       }
     }
-    this.bg.drawLayers(ctx, a, camX, w, this.groundY);
+    this.bg.drawLayers(ctx, a, camX, w, this.groundY, false, this.shore ? { sx: this.shore.x - camX + w / 2, side: this.shore.side } : null);
     if (this.rays > 0.01 && a.sunH > 0.05) this.drawRays(ctx, a, camX, time);
 
     const wctx = this.worldCtx;
@@ -226,6 +237,7 @@ export class Renderer {
     cb.world(wctx);
     this.particles.draw(wctx, camX, w, this.groundY, false);
     this.lighting.apply(wctx, this.lights, a, camX, this.groundY, w, h, time);
+    this.grade(wctx, a, 0, h);
     ctx.drawImage(this.world, 0, 0);
 
     cb.emissive?.(ctx);
@@ -243,6 +255,7 @@ export class Renderer {
     if (this.lilies && this.frozen <= 0.01) drawLilies(fctx, this.waterTop, w, time, a, camX);
     this.ground.drawReeds(fctx, camX, w, this.waterTop, time);
     this.lighting.shade(fctx, a, fy, w, h - fy);
+    this.grade(fctx, a, fy, h - fy);
     ctx.drawImage(this.fg, 0, fy, w, h - fy, 0, fy, w, h - fy);
     cb.water?.(ctx);
 

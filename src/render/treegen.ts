@@ -510,9 +510,10 @@ export function makeBirch(rng: Rng, height: number, snow = false, leafless = fal
   const m = blank(w, h);
   const cx = Math.floor(w / 2);
   const top = h - height;
-  const trunkTop = top + Math.round(height * 0.06);
-  trunk(m, cx, trunkTop, h - 1, height > 80 ? 4 : 3, 2, rng, true);
   const crownTop = top + height * 0.04;
+  // Ствол кончается внутри кроны, а не торчит над ней «перископом».
+  const trunkTop = leafless ? top + Math.round(height * 0.06) : Math.round(crownTop + crownR * 0.9);
+  trunk(m, cx, trunkTop, h - 1, height > 80 ? 4 : 3, 2, rng, true);
   const crownBottom = top + height * rng.range(0.56, 0.66);
   // Тонкие ветви: вверх у макушки, в стороны и вниз — ниже.
   const tips: Array<[number, number]> = [];
@@ -546,10 +547,11 @@ export function makeBirch(rng: Rng, height: number, snow = false, leafless = fal
     const half = crownR * 0.55 * Math.sin(Math.PI * Math.min(1, 0.15 + t));
     clumps.push(mk(cx + rng.range(-half, half), y, crownR * rng.range(0.34, 0.5), rng.range(-2, crownR * 0.4)));
   }
-  // Гроздья на концах ветвей.
-  tips.forEach(([x, y], i) => {
-    if (i % 2 === 1 && rng.chance(0.5)) return;
-    clumps.push(mk(x, y + 1, crownR * rng.range(0.2, 0.32), rng.range(-1, crownR * 0.3)));
+  // Макушка — один круглый клуб над стволом.
+  clumps.push(mk(cx + rng.range(-1, 1), crownTop + crownR * 0.5, crownR * rng.range(0.42, 0.52), crownR * 0.2));
+  // Гроздья на концах всех ветвей — голых серых «ниток» между шарами нет.
+  tips.forEach(([x, y]) => {
+    clumps.push(mk(x, y + 1, crownR * rng.range(0.22, 0.34), rng.range(-1, crownR * 0.3)));
   });
   crown(m, clumps, { seed: rng.int(0, 1 << 20), texture: 0.22, bottomDark: 0.22, holes: rng.int(1, 3), grain: Math.max(2.5, Math.min(3.5, height / 28)) });
   overlayCrown(m, bark);

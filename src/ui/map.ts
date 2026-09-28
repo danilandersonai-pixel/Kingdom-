@@ -147,8 +147,8 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
     const cur = i === c.current;
     const sel = selected === i;
     const rw = drawIsland(ctx, x, iy, i, !reached, cleared);
-    if (!reached) drawText(ctx, '?', x, iy - 16, { align: 'center', color: '#6a6a78' });
-    drawText(ctx, toRoman(i), x, iy + 6, { align: 'center', color: sel ? '#fff4d8' : cur ? '#f2c84a' : reached ? '#d8ccb0' : '#5a5a66' });
+    if (!reached) drawText(ctx, '?', x, iy - 16, { align: 'center', color: '#8a8a9a' });
+    drawText(ctx, toRoman(i), x, iy + 6, { align: 'center', color: sel ? '#fff4d8' : cur ? '#f2c84a' : reached ? '#d8ccb0' : '#8a8a9a' });
     if (sel) {
       rect(ctx, x - rw / 2 - 4, iy + 14, rw + 8, 1, '#f2c84a');
       if (blink) drawText(ctx, 'v', x, iy - 22, { align: 'center', color: '#f2c84a' });
@@ -170,18 +170,23 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
 
   // ——— Схема текущего острова на доске ———
   const sy = Math.round(H * 0.6);
-  drawPanel(ctx, px - 10, sy - 22, pw + 20, 72, 0.7);
+  drawPanel(ctx, px - 10, sy - 22, pw + 20, 76, 0.7);
   const L = w.island.left;
   const R = w.island.right;
   const toX = (x: number) => Math.round(px + ((x - L) / (R - L)) * pw);
-  rect(ctx, px, sy, pw, 2, '#4e7a3a');
-  rect(ctx, px, sy + 2, pw, 1, '#6a5038');
-  rect(ctx, px - 4, sy + 3, pw + 8, 2, '#2a4a6a');
-  for (let i = 0; i < w.terrain.cells; i += 2) {
+  // Лес — тёмная лента крон с неровным верхом; земля и вода под ней.
+  for (let i = 0; i < w.terrain.cells; i++) {
     if (!w.terrain.forest[i]) continue;
-    const h = 3 + (i % 3);
-    rect(ctx, toX(w.terrain.cellX(i)), sy - h, 1, h, i % 4 ? '#2e4a2e' : '#3a5a36');
+    const x = toX(w.terrain.cellX(i));
+    const h = 4 + Math.round(Math.sin(i * 1.7) * 1.5 + Math.sin(i * 0.53) * 1.5);
+    rect(ctx, x, sy - h, 2, h, '#24402a');
+    rect(ctx, x, sy - h, 1, 1, '#3e6a3a');
   }
+  rect(ctx, px, sy, pw, 3, '#4e7a3a');
+  rect(ctx, px, sy, pw, 1, '#6a9a4a');
+  rect(ctx, px, sy + 3, pw, 2, '#6a5038');
+  rect(ctx, px - 4, sy + 5, pw + 8, 3, '#2a4a6a');
+  rect(ctx, px - 4, sy + 5, pw + 8, 1, '#3a6a92');
   for (const s of w.all<Structure>('structure')) {
     const x = toX(s.x);
     switch (s.type) {
@@ -225,10 +230,11 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
         break;
     }
   }
+  // Монарх: корона на булавке, воткнутой в землю, — видно, где именно он.
   for (const mx of monarchX) {
     const x = toX(mx);
-    iconCrown(ctx, x, sy - 12);
-    rect(ctx, x, sy - 10, 1, 1, '#f2c84a');
+    for (let y = sy - 9; y < sy; y += 2) rect(ctx, x, y, 1, 1, '#f2c84a');
+    iconCrown(ctx, x, sy - 10);
   }
   // Легенда: значок и подпись, строкой по центру.
   const legend: Array<[string, (x: number, y: number) => void]> = [
@@ -244,13 +250,13 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
   const gap = 9;
   const total = legend.reduce((s, [t]) => s + 10 + textWidth(t) + gap, -gap);
   let lx = Math.round(W / 2 - total / 2);
-  const ly = sy + 16;
+  const ly = sy + 19;
   for (const [t, draw] of legend) {
     draw(lx + 3, ly);
     drawText(ctx, t, lx + 10, ly - 6, { color: '#b8ac90', shadow: null });
     lx += 10 + textWidth(t) + gap;
   }
   const t = w.time;
-  drawText(ctx, `ОСТРОВ ${toRoman(w.island.index)}   ДЕНЬ ${t.day}   ${SEASON_NAMES[t.season].toUpperCase()}`, Math.round(W / 2), sy + 27, { align: 'center', color: '#e8dcc0' });
-  drawText(ctx, `ПРАВЛЕНИЕ ${toRoman(c.reign)}   ПЕЩЕР ВЗОРВАНО ${c.caves.size} ИЗ 5`, Math.round(W / 2), sy + 38, { align: 'center', color: '#b0a488' });
+  drawText(ctx, `ОСТРОВ ${toRoman(w.island.index)}   ДЕНЬ ${toRoman(t.day)}   ${SEASON_NAMES[t.season].toUpperCase()}`, Math.round(W / 2), sy + 30, { align: 'center', color: '#e8dcc0' });
+  drawText(ctx, `ПРАВЛЕНИЕ ${toRoman(c.reign)}   ВЗОРВАНО ПЕЩЕР: ${c.caves.size} ИЗ 5 (ПО ОДНОЙ НА ОСТРОВ)`, Math.round(W / 2), sy + 41, { align: 'center', color: '#b0a488' });
 }

@@ -391,15 +391,8 @@ export class IslandEdge extends Structure {
     const cx0 = this.side > 0 ? edgeX - bw * 0.7 : -4;
     const cx1 = this.side > 0 ? r.w + 4 : edgeX + bw * 0.7;
     ctx.clearRect(Math.round(cx0), gy - 18, Math.round(cx1 - cx0), 30);
-    // Море вместо полосы земли за краем острова: светлая гладь у поверхности, глубже темнее.
+    // Само море нарисовано в фоне (до дальнего берега); здесь — гребни волн у берега.
     const surf = a ? mix(a.waterDeep, a.skyHorizon, 0.45) : hexColor('#5a8aa0');
-    const deep = a ? mix(a.waterDeep, a.skyHorizon, 0.12) : hexColor('#3a6a80');
-    const x0 = this.side > 0 ? edgeX - 6 : -4;
-    const x1 = this.side > 0 ? r.w + 4 : edgeX + 6;
-    for (let y = 0; y < 20; y++) {
-      ctx.fillStyle = rgb(mix(surf, deep, Math.min(1, y / 12)));
-      ctx.fillRect(x0, gy - 4 + y, x1 - x0, 1);
-    }
     // Гребни волн бегут к берегу.
     const t = this.world.clock;
     const crest = rgb(mix(surf, hexColor('#ffffff'), 0.45));

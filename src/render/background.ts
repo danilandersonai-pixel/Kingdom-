@@ -73,7 +73,10 @@ class Layer {
     const metas: Array<{ w: number; h: number; ax: number; ever: boolean }> = [];
     const totalWeight = def.kinds.reduce((s, [, w]) => s + w, 0);
     for (let i = 0; i < def.variants; i++) {
-      let r = rng.next() * totalWeight;
+      // Своя последовательность случайных чисел у каждого дерева: порода, высота
+      // и форма не зависят от сезона (раньше летняя ель зимой становилась голым дубом).
+      const tr = new Rng(this.seed * 31 + this.index * 977 + i * 7919 + 13);
+      let r = tr.next() * totalWeight;
       let kind: TreeKind = def.kinds[0][0];
       for (const [k, w] of def.kinds) {
         if ((r -= w) <= 0) {
@@ -81,9 +84,9 @@ class Layer {
           break;
         }
       }
-      const h = Math.round(rng.range(def.heights[0], def.heights[1]));
+      const h = Math.round(tr.range(def.heights[0], def.heights[1]));
       const detail = [0, 0.15, 0.3, 0.5, 0.7][this.index] ?? 0.5;
-      const m = kind === 'bush' ? makeBush(rng, h * 2, h, snow) : makeTree(kind, rng, h, snow, leafless && kind !== 'pine' && kind !== 'tallpine', detail);
+      const m = kind === 'bush' ? makeBush(tr, h * 2, h, snow) : makeTree(kind, tr, h, snow, leafless && kind !== 'pine' && kind !== 'tallpine', detail);
       trees.push(masksToCanvases(m));
       metas.push({ w: m.w, h: m.h, ax: m.ax, ever: kind === 'pine' || kind === 'tallpine' });
     }
@@ -736,8 +739,37 @@ export class Background {
     ctx.fillRect(cx - r, cy - r, r * 2, r * 2);
   }
 
+  /** Открытое море за краем острова: от линии дальнего берега до воды у ног. */
+  private drawSea(ctx: CanvasRenderingContext2D, a: Atmosphere, shore: { sx: number; side: -1 | 1 }, w: number, groundY: number): void {
+    const x0 = shore.side > 0 ? Math.max(0, Math.round(shore.sx)) : 0;
+    const x1 = shore.side > 0 ? w : Math.min(w, Math.round(shore.sx));
+    if (x1 <= x0) return;
+    const top = groundY - LAYERS[1].lift + 1;
+    const bottom = groundY + 20;
+    const surf = mix(a.waterDeep, a.skyHorizon, 0.55);
+    const deep = mix(a.waterDeep, a.skyHorizon, 0.14);
+    for (let y = top; y < bottom; y++) {
+      const t = (y - top) / (bottom - top);
+      ctx.fillStyle = rgb(mix(surf, deep, Math.pow(t, 0.7)));
+      ctx.fillRect(x0, y, x1 - x0, 1);
+    }
+    // Линия горизонта и бегущие блики: у горизонта мельче и чаще.
+    ctx.fillStyle = rgb(mix(surf, a.skyHorizon, 0.6));
+    ctx.fillRect(x0, top, x1 - x0, 1);
+    const glint = rgb(mix(surf, hex('#ffffff'), 0.4), 0.45 * a.clear + 0.1);
+    ctx.fillStyle = glint;
+    const span = x1 - x0 + 60;
+    for (let k = 0; k < 28; k++) {
+      const d = hash2(k, 11);
+      const y = Math.round(top + 2 + d * d * (bottom - top - 6));
+      const len = 2 + Math.round((y - top) / 4 + hash2(k, 12) * 3);
+      const x = x0 - 30 + ((hash2(k, 13) * 977 + this.lastTime * (2 + (k % 4))) % span);
+      ctx.fillRect(Math.round(x), y, len, 1);
+    }
+  }
+
   /** Слои леса с дымкой между ними. */
-  drawLayers(ctx: CanvasRenderingContext2D, a: Atmosphere, camX: number, w: number, groundY: number, force = false): void {
+  drawLayers(ctx: CanvasRenderingContext2D, a: Atmosphere, camX: number, w: number, groundY: number, force = false, shore: { sx: number; side: -1 | 1 } | null = null): void {
     // Только что построенный слой (старт, смена сезона) красим сразу.
     for (let i = 0; i < this.layers.length; i++) if (force || this.layers[i].uncolored) this.layers[i].recolor(a.layers[i], a.evergreen[i]);
     if (this.recolorTimer <= 0) {
@@ -746,7 +778,18 @@ export class Background {
       this.layers[i].recolor(a.layers[i], a.evergreen[i]);
       this.recolorTimer = 0.2 / this.layers.length;
     }
+    let clipped = false;
     for (let i = 0; i < this.layers.length; i++) {
+      // За краем острова ближний лес кончается: дальний берег, а перед ним — море.
+      if (shore && i === 2) {
+        this.drawSea(ctx, a, shore, w, groundY);
+        ctx.save();
+        ctx.beginPath();
+        if (shore.side > 0) ctx.rect(0, 0, Math.max(0, Math.round(shore.sx)), groundY + 24);
+        else ctx.rect(Math.round(shore.sx), 0, w - Math.round(shore.sx), groundY + 24);
+        ctx.clip();
+        clipped = true;
+      }
       const tone = a.layers[i];
       this.layers[i].draw(ctx, camX, w, groundY, tone);
       // Дымка у земли после дальних слоёв.
@@ -762,5 +805,6 @@ export class Background {
     }
     void LAYER_COUNT;
     void fxRng;
+    if (clipped) ctx.restore();
   }
 }

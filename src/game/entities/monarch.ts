@@ -9,7 +9,7 @@ import type { Light } from '../../render/lighting';
 import { blit, hex } from '../../engine/sprite';
 import { mountFrames, KING, type RiderLook, type MountAnim } from '../../art/horse';
 import type { PlayerInput } from '../../engine/input';
-import { MS, PURSE } from '../config';
+import { M, MS, PURSE } from '../config';
 import { MOUNTS, type MountDef, type MountId } from '../mounts';
 import { Coin, DroppedCrown } from './pickups';
 import type { Payable } from '../structures/structure';
@@ -186,8 +186,10 @@ export class Monarch extends Entity {
     this.speed = approach(this.speed, c.axis * top, (c.axis === 0 ? 170 : 120) * dt);
     this.x += this.speed * dt;
     const isl = w.island;
-    const lo = isl.left + 16;
-    const hi = isl.right - 16;
+    // Со стороны пляжа конь останавливается у кромки воды, а не заходит в море.
+    const shore = 2 * M + 6;
+    const lo = isl.left + (isl.beachSide < 0 ? shore : 16);
+    const hi = isl.right - (isl.beachSide > 0 ? shore : 16);
     if (this.x < lo || this.x > hi) {
       this.x = clamp(this.x, lo, hi);
       this.speed = 0;

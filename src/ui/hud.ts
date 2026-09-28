@@ -6,14 +6,13 @@ import type { Renderer } from '../render/renderer';
 import type { World } from '../game/world';
 import type { Monarch } from '../game/entities/monarch';
 import { blit } from '../engine/sprite';
-import { hudGem, coinSprites, gemSprite, pouchSprites, pouchRimY } from '../art/items';
-import { drawText } from '../engine/font';
+import { hudGem, coinSprites, gemSprite, pouchSprites, pouchRimY, pileCoinSprites } from '../art/items';
+import { drawText, textWidth } from '../engine/font';
 import { PURSE } from '../game/config';
 import { clamp, toRoman } from '../engine/math';
 
-/** Места монет в горке: ряды сужаются кверху, лёгкий разброс, разные кадры
- *  блеска — монеты лежат лицом или чуть повёрнутыми, не ребром. */
-const PILE_FRAMES = [0, 0, 1, 5, 0, 2, 5, 4];
+/** Места монет в горке: ряды сужаются кверху, лёгкий разброс, разные блики.
+ *  Монеты лежат плашмя — ряды плотные, горка невысокая. */
 const pileCache = new Map<number, Array<[number, number, number]>>();
 function pilePositions(n: number): Array<[number, number, number]> {
   let out = pileCache.get(n);
@@ -21,16 +20,16 @@ function pilePositions(n: number): Array<[number, number, number]> {
   out = [];
   let row = 0;
   while (out.length < n) {
-    const cap = Math.max(3, 11 - row);
+    const cap = Math.max(3, 10 - row);
     // Ряд заполняется от середины к краям.
     const order = Array.from({ length: cap }, (_, k) => k).sort((a, b) => Math.abs(a - (cap - 1) / 2) - Math.abs(b - (cap - 1) / 2));
     for (const k of order) {
       if (out.length >= n) break;
       const h = Math.sin((out.length + 1) * 12.9898) * 43758.5453;
       const jit = h - Math.floor(h);
-      const x = (k - (cap - 1) / 2) * 4 + (row % 2) * 0.5 + (jit - 0.5) * 1.6;
-      const y = -row * 2.6 - (jit > 0.75 ? 1 : 0);
-      out.push([Math.round(x), Math.round(y), PILE_FRAMES[Math.floor(jit * PILE_FRAMES.length) % PILE_FRAMES.length]]);
+      const x = (k - (cap - 1) / 2) * 4 + (row % 2) * 0.5 + (jit - 0.5) * 1.4;
+      const y = -row * 2 - (jit > 0.8 ? 1 : 0);
+      out.push([Math.round(x), Math.round(y), Math.floor(jit * 3) % 3]);
     }
     row++;
   }
@@ -81,13 +80,21 @@ export class Hud {
       if (filled) {
         blit(ctx, gem ? gemSprite() : coinSprites()[0], x, y + 2);
       } else {
-        // Пустой слот — кружок-контур.
-        ctx.globalAlpha = paying ? 0.95 : 0.7;
+        // Пустой слот — кружок-контур с тёмной каймой: виден и на светлом небе, и в листве.
+        const ring = (dx: number, dy: number) => {
+          ctx.fillRect(x - 1 + dx, y - 3 + dy, 3, 1);
+          ctx.fillRect(x - 1 + dx, y + 1 + dy, 3, 1);
+          ctx.fillRect(x - 2 + dx, y - 2 + dy, 1, 3);
+          ctx.fillRect(x + 2 + dx, y - 2 + dy, 1, 3);
+        };
+        ctx.globalAlpha = paying ? 0.7 : 0.5;
+        ctx.fillStyle = '#1a1208';
+        ring(0, 1);
+        ring(1, 0);
+        ctx.fillRect(x - 1, y - 2, 3, 3);
+        ctx.globalAlpha = paying ? 1 : 0.85;
         ctx.fillStyle = gem ? '#8ee8f4' : '#f2e2a8';
-        ctx.fillRect(x - 1, y - 3, 3, 1);
-        ctx.fillRect(x - 1, y + 1, 3, 1);
-        ctx.fillRect(x - 2, y - 2, 1, 3);
-        ctx.fillRect(x + 2, y - 2, 1, 3);
+        ring(0, 0);
         ctx.globalAlpha = 1;
       }
     }
@@ -98,12 +105,13 @@ export class Hud {
     const a = this.purseAlpha;
     const bag = pouchSprites();
     const cx = Math.floor(r.w / 2);
-    const top = 3;
-    ctx.globalAlpha = a;
+    // Кошелёк выезжает сверху и уезжает обратно — без полупрозрачной серости.
+    const ease = 1 - Math.pow(1 - a, 3);
+    const top = 3 - Math.round((1 - ease) * (bag.back.h + 8));
     blit(ctx, bag.back, cx, top);
     // Монеты насыпаны горкой внутри: нижний ряд уходит за передний край,
     // по бокам горка приподнята — дно у мешка круглое.
-    const frames = coinSprites();
+    const frames = pileCoinSprites();
     const gem = hudGem();
     const base = top + Math.round(pouchRimY(0)) + 1;
     const lift = (x: number) => Math.round(pouchRimY(x) - pouchRimY(0));
@@ -124,10 +132,9 @@ export class Hud {
     for (let i = 0; i < over; i++) {
       const row = Math.floor(i / 5);
       const jx = ((i * 37) % 5) - 2;
-      blit(ctx, frames[PILE_FRAMES[(i * 5) % PILE_FRAMES.length]], cx - 9 + (i % 5) * 4 + (row % 2) * 2 + Math.round(jx * 0.4), base - 12 - row * 3);
+      blit(ctx, frames[i % frames.length], cx - 9 + (i % 5) * 4 + (row % 2) * 2 + Math.round(jx * 0.4), base - 10 - row * 2);
     }
     blit(ctx, bag.front, cx, top);
-    ctx.globalAlpha = 1;
   }
 
   private drawDay(ctx: CanvasRenderingContext2D, r: Renderer, blood = false): void {
@@ -140,7 +147,14 @@ export class Hud {
     const scale = text.length > 6 ? 2 : 3;
     const y = Math.floor(r.h * 0.23);
     drawText(ctx, 'ДЕНЬ', Math.floor(r.w / 2), y - 11, { align: 'center', color: blood ? '#f0a090' : '#e8dcc0', alpha: a * 0.9, outline: '#1a1410' });
-    drawText(ctx, text, Math.floor(r.w / 2), y, { align: 'center', scale, color: blood ? '#e84a36' : '#f4ecd8', alpha: a, outline: '#1a1410' });
+    // Римские цифры — с разрядкой, чтобы засечки соседних I не сливались в решётку.
+    const gap = scale;
+    const widths = [...text].map((ch) => textWidth(ch, scale));
+    let x = Math.floor(r.w / 2 - (widths.reduce((s2, v) => s2 + v, 0) + (scale + gap) * (text.length - 1)) / 2);
+    [...text].forEach((ch, i) => {
+      drawText(ctx, ch, x, y, { scale, color: blood ? '#e84a36' : '#f4ecd8', alpha: a, outline: '#1a1410' });
+      x += widths[i] + scale + gap;
+    });
   }
 
   private drawBanners(ctx: CanvasRenderingContext2D, r: Renderer, w: World): void {
@@ -149,10 +163,10 @@ export class Hud {
     for (const b of w.banners) {
       const t = b.time;
       const a = t < 0.6 ? t / 0.6 : t > b.duration - 1 ? Math.max(0, b.duration - t) : 1;
-      drawText(ctx, b.text, Math.floor(r.w / 2), y, { align: 'center', scale: 2, color: '#f4ecd8', alpha: a });
+      drawText(ctx, b.text, Math.floor(r.w / 2), y, { align: 'center', scale: 2, color: '#f4ecd8', alpha: a, outline: '#1a1410' });
       y += 18;
       if (b.sub) {
-        drawText(ctx, b.sub, Math.floor(r.w / 2), y, { align: 'center', scale: 1, color: '#d8ccb0', alpha: a });
+        drawText(ctx, b.sub, Math.floor(r.w / 2), y, { align: 'center', scale: 1, color: '#e0d4b8', alpha: a, outline: '#1a1410' });
         y += 12;
       }
     }

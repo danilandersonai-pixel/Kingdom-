@@ -643,6 +643,9 @@ export class Person extends Entity {
       this.y = tower.platform;
       const target = this.findShootTarget(this.archerRange(), w.time.isDay);
       this.shootAt(target);
+      // Без цели крайние смотрят наружу, в разные стороны, — на площадке не
+      // выстраивается «решётка» из одинаковых луков.
+      if (!target && tower.archers.length > 1) this.facing = slot < (tower.archers.length - 1) / 2 ? -1 : 1;
       return;
     }
     // Свободные башни — занимаем.
@@ -1048,15 +1051,19 @@ export class Person extends Entity {
       if (Math.abs(m.x - this.x) > TITHE.range) continue;
       if (Math.abs(m.velocity) > m.walkSpeed * TITHE.speedFrac) continue;
       if (m.coins >= PURSE.overflow) continue;
-      this.titheTimer = TITHE.interval;
+      // Броски вразнобой и по разным дугам: несколько жителей рядом (лучники
+      // на башне) не выпускают монеты единым «слитком».
+      this.titheTimer = TITHE.interval + fxRng.range(0, 0.25);
       this.coins--;
-      const c = new Coin(this.x, this.y + 14, (m.x - this.x) * 1.4, 70);
+      const c = new Coin(this.x + fxRng.range(-2, 2), this.y + 14, (m.x - this.x) * fxRng.range(1.2, 1.6), fxRng.range(58, 84));
       c.homing = m.id;
       w.add(c);
       this.action = 'act';
       this.actionTimer = 0.25;
       return;
     }
+    // Монарха рядом нет — следующая проверка через случайную паузу.
+    this.titheTimer = fxRng.range(0.02, 0.3);
   }
 
   // ——— Отрисовка ———

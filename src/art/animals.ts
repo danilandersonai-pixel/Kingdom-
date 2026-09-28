@@ -84,12 +84,17 @@ function dog(ctx: CanvasRenderingContext2D, anim: AnimalAnim, t: number): void {
   poly(ctx, [[12, by - 4], [13, by - 7], [14, by - 4]], dark);
 }
 
+/** Далёкая птица: изогнутые крылья «v» / «ᴧ» без палочки тела. */
 function bird(ctx: CanvasRenderingContext2D, _anim: AnimalAnim, t: number): void {
   const s = Math.sin(t * Math.PI * 2);
   const c = '#2a2630';
-  line(ctx, 1, 3 + s * 2, 3, 3, c);
-  line(ctx, 3, 3, 5, 3 + s * 2, c);
-  px(ctx, 3, 4, c);
+  const mid = Math.round(3 + s * 1.2);
+  const tip = Math.round(3 + s * 2.4);
+  px(ctx, 3, 3, c);
+  line(ctx, 2, 3, 1, mid, c);
+  line(ctx, 1, mid, 0, tip, c);
+  line(ctx, 4, 3, 5, mid, c);
+  line(ctx, 5, mid, 6, tip, c);
 }
 
 function fish(ctx: CanvasRenderingContext2D): void {

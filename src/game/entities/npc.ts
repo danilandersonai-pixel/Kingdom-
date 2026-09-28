@@ -235,7 +235,10 @@ export class Ghost extends Entity {
     const w = this.world;
     const m = w.all<Monarch>('monarch')[0];
     if (!m) return;
-    this.sayTimer -= dt;
+    // Пока на экране крупная надпись (название острова и т. п.), призрак молчит
+    // и не тратит время реплики — она появится, когда надпись погаснет.
+    const quiet = w.banners.length > 0;
+    if (!quiet) this.sayTimer -= dt;
     if (this.done) {
       this.fade += dt * 0.4;
       if (this.fade >= 1) this.dead = true;
@@ -296,7 +299,7 @@ export class Ghost extends Entity {
       blit(ctx, coinSprites()[Math.floor(this.anim * 8) % 6], r.sx(this.hintTarget), r.sy(40 + bob));
       ctx.globalAlpha = 1;
     }
-    if (this.sayTimer > 0) {
+    if (this.sayTimer > 0 && !this.world.banners.length) {
       const a = Math.min(1, this.sayTimer);
       drawText(ctx, this.said, r.sx(this.x), r.sy(52), { align: 'center', color: '#dff4ff', alpha: a * (1 - this.fade) });
     }

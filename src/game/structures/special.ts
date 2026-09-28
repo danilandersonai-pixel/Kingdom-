@@ -346,6 +346,9 @@ export class SiegeWorkshop extends Structure {
   override update(): void {
     const ow = outerWall(this.world, this.side);
     if (ow) this.x = ow.x - this.side * 3.5 * M;
+    // Не ставить мастерскую на остов лодки у причала — отодвинуть к городу.
+    const dock = this.world.all<Structure>('structure').find((s) => s.type === 'dock');
+    if (dock && Math.abs(this.x - dock.x) < 44) this.x = dock.x - this.side * 44;
   }
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     if (!this.enabled) return;

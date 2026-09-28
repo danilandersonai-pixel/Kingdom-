@@ -348,11 +348,15 @@ function paintLevel(level: number, ctx: CanvasRenderingContext2D, w: number, h: 
       crenels(ctx, cx - 12, h - 74, 24, 78, pal);
       cone(ctx, cx, h - 78, 11, 14, SLATE);
       if (iron) {
-        for (const y of [h - 30, h - 58]) {
-          rect(ctx, 1, y, w - 2, 2, IRONS[1]);
-          rect(ctx, 1, y, w - 2, 1, IRONS[3]);
-          for (let x = 3; x < w - 2; x += 5) px(ctx, x, y + 1, IRONS[0]);
-        }
+        // Железные пояса: нижний — по всей стене, верхний — только по башням
+        // и донжону (между ними пусто, пояс не висит в воздухе).
+        const band = (x0: number, x1: number, y: number) => {
+          rect(ctx, x0, y, x1 - x0, 2, IRONS[1]);
+          rect(ctx, x0, y, x1 - x0, 1, IRONS[3]);
+          for (let x = x0 + 2; x < x1 - 1; x += 5) px(ctx, x, y + 1, IRONS[0]);
+        };
+        band(1, w - 1, h - 30);
+        for (const [x0, x1] of [[1, 16], [cx - 12, cx + 12], [w - 16, w - 1]] as Array<[number, number]>) band(x0, x1, h - 58);
       }
       door(ctx, cx - 7, h - 21, 14, 21, true);
       for (const [x, y] of [[7, h - 52], [w - 9, h - 52], [7, h - 32], [w - 9, h - 32], [cx - 5, h - 64], [cx + 3, h - 64], [cx - 1, h - 52]] as Array<[number, number]>) win(ctx, d, x, y, 2, 4, pal[0]);

@@ -385,8 +385,8 @@ export class App {
     }
     t.drop = false;
     if (primary) {
-      // Кнопка паузы в правом верхнем углу.
-      if (primary.startX > w - 26 && primary.startY < 24) {
+      // Кнопка паузы в правом верхнем углу (зона побольше кружка — пальцем легко попасть).
+      if (primary.startX > w - 34 && primary.startY < 32) {
         inp.consumePointer(primary.id);
         this.openPause();
         return;
@@ -475,6 +475,12 @@ export class App {
         if (p0.pressed('right')) pick(1);
         for (const tap of this.input.taps) {
           const W = this.screen.w;
+          const b = this.cancelRect();
+          if (tap.x >= b.x && tap.x <= b.x + b.w && tap.y >= b.y && tap.y <= b.y + b.h) {
+            this.sail = null;
+            this.setState('playing');
+            break;
+          }
           const px = Math.round(W * 0.08);
           const i = Math.floor(((tap.x - px) / (W - px * 2)) * 5) + 1;
           if (i >= 1 && i <= max && i !== c.current) {
@@ -565,6 +571,7 @@ export class App {
     const clear = r.weather.kind === 'rain' ? 1 - r.weather.intensity : 1;
     r.rays = w.time.isDay && !winter ? clear : Math.max(0, r.rays - dt);
     r.lilies = w.time.season === 'spring' || w.time.season === 'summer';
+    r.shore = { x: w.island.beachSide * (w.island.right - 2 * M), side: w.island.beachSide };
     this.ambience.update(dt, { season: w.time.season, night: nightFactor(w.time.phase), day: w.time.isDay, rain: r.weather.kind === 'rain' ? r.weather.intensity : 0, frozen: r.frozen > 0.5 });
   }
 
@@ -642,7 +649,7 @@ export class App {
         if (showHud && this.reroll && focus === this.monarchs[0]) {
           const touch = this.touchDevice();
           const hint = touch ? 'ТАП ПО МОНАРХУ — ДРУГОЙ ПРАВИТЕЛЬ' : 'S ИЛИ ВНИЗ — ДРУГОЙ ПРАВИТЕЛЬ';
-          drawText(ctx, hint, Math.floor(r.w / 2), r.h - (touch ? 46 : 12), { align: 'center', color: '#f4ecd8', alpha: 0.7 });
+          drawText(ctx, hint, Math.floor(r.w / 2), r.h - (touch ? 66 : 12), { align: 'center', color: '#f4ecd8', alpha: 0.85, outline: '#14100c' });
         }
       },
     });
@@ -689,18 +696,40 @@ export class App {
   }
 
   private drawTouchHints(ctx: CanvasRenderingContext2D): void {
-    const { w } = this.screen;
-    // Кнопка паузы.
-    ctx.globalAlpha = 0.5;
+    const { w, h } = this.screen;
+    // Кнопка паузы: тёмный кружок с белым значком.
+    const bx = w - 16;
+    const by = 15;
+    ctx.globalAlpha = 0.55;
+    ctx.fillStyle = '#0c0a10';
+    for (let y = -9; y <= 9; y++) {
+      const hw = Math.floor(Math.sqrt(90 - y * y));
+      ctx.fillRect(bx - hw, by + y, hw * 2 + 1, 1);
+    }
+    ctx.globalAlpha = 0.95;
     ctx.fillStyle = '#f4ecd8';
-    ctx.fillRect(w - 16, 8, 2, 8);
-    ctx.fillRect(w - 12, 8, 2, 8);
+    ctx.fillRect(bx - 3, by - 4, 2, 9);
+    ctx.fillRect(bx + 2, by - 4, 2, 9);
     ctx.globalAlpha = 1;
     // Первое утро — подсказка жестов (на телефоне видна сразу, до первого касания).
     if (this.world.time.day === 1 && this.world.time.phase < 0.3) {
-      drawText(ctx, 'ТЯНИТЕ ПАЛЬЦЕМ — ИДТИ, К КРАЮ — ГАЛОП', Math.floor(w / 2), this.screen.h - 34, { align: 'center', color: '#f4ecd8', alpha: 0.8 });
-      drawText(ctx, 'СВАЙП ВНИЗ И ДЕРЖАТЬ — ПЛАТИТЬ', Math.floor(w / 2), this.screen.h - 22, { align: 'center', color: '#f4ecd8', alpha: 0.8 });
+      const y0 = h - 50;
+      ctx.fillStyle = 'rgba(8,8,16,0.45)';
+      ctx.fillRect(0, y0 - 4, w, 26);
+      drawText(ctx, 'ТЯНИТЕ ПАЛЬЦЕМ — ИДТИ, К КРАЮ — ГАЛОП', Math.floor(w / 2), y0, { align: 'center', color: '#f4ecd8' });
+      drawText(ctx, 'СВАЙП ВНИЗ И ДЕРЖАТЬ — ПЛАТИТЬ', Math.floor(w / 2), y0 + 11, { align: 'center', color: '#f4ecd8' });
     }
+  }
+
+  /** Кнопка «Отмена» на экране выбора острова (для касаний). */
+  private cancelRect(): { x: number; y: number; w: number; h: number } {
+    const { w, h } = this.screen;
+    return { x: Math.floor(w / 2) - 34, y: h - 26, w: 68, h: 17 };
+  }
+
+  /** Подсказка «нажмите» для клавиатуры или касания. */
+  private pressHint(): string {
+    return this.touchDevice() ? 'КОСНИТЕСЬ ЭКРАНА' : 'НАЖМИТЕ ENTER';
   }
 
   private dim(ctx: CanvasRenderingContext2D, a: number): void {
@@ -719,15 +748,15 @@ export class App {
         const logoY = Math.floor(h * 0.07);
         const lh = drawLogo(ctx, cx, logoY, a, this.time);
         const subY = logoY + lh + 3;
-        drawText(ctx, 'ДВЕ КОРОНЫ И ЖАДНОСТЬ', cx, subY, { align: 'center', color: '#e8d8b0', alpha: a });
+        drawText(ctx, 'МОНЕТА ЗА МОНЕТОЙ', cx, subY, { align: 'center', color: '#e8d8b0', alpha: a, outline: '#1a1208' });
         // Меню помещается между подзаголовком и подсказкой внизу при любой высоте экрана.
         const n = this.menu.items.length;
         const minY = subY + 20;
-        const maxBottom = h - 18;
+        const maxBottom = h - 22;
         const lineH = clamp(Math.floor((maxBottom - minY) / n), 11, 15);
         const menuY = Math.max(minY, Math.min(Math.floor(h * 0.42), maxBottom - n * lineH));
         this.menu.draw(ctx, cx, menuY, lineH);
-        drawText(ctx, this.touchDevice() ? 'КОСНИТЕСЬ ПУНКТА МЕНЮ' : 'СТРЕЛКИ/WASD — ВЫБОР, ENTER — ОК', cx, h - 12, { align: 'center', color: '#c8bca0', alpha: 0.6 });
+        drawText(ctx, this.touchDevice() ? 'КОСНИТЕСЬ ПУНКТА МЕНЮ' : 'СТРЕЛКИ/WASD — ВЫБОР, ENTER — ОК', cx, h - 16, { align: 'center', color: '#e0d4b8', alpha: 0.9, outline: '#14100c' });
         break;
       }
       case 'help': {
@@ -737,7 +766,7 @@ export class App {
         const lh = 11;
         const top = Math.max(6, Math.floor(h / 2 - (lines.length * lh) / 2) - 6);
         drawPanel(ctx, cx - tw / 2, top, tw, lines.length * lh + 12, 0.82);
-        lines.forEach((line, i) => drawText(ctx, line, cx, top + 7 + i * lh, { align: 'center', color: i === 0 ? '#f2c84a' : i === lines.length - 1 ? '#c8bca0' : '#e8dcc0' }));
+        lines.forEach((line, i) => drawText(ctx, line === 'НАЖМИТЕ ENTER' ? this.pressHint() : line, cx, top + 7 + i * lh, { align: 'center', color: i === 0 ? '#f2c84a' : i === lines.length - 1 ? '#c8bca0' : '#e8dcc0' }));
         break;
       }
       case 'paused':
@@ -751,7 +780,14 @@ export class App {
         drawText(ctx, 'КУДА ПЛЫТЬ?', cx, 14, { align: 'center', scale: 2 });
         drawMap(ctx, w, Math.floor(h * 0.7), this.world, this.campaign, this.monarchs.map((m) => m.x), this.chooseIndex);
         drawText(ctx, `ОСТРОВ ${toRoman(this.chooseIndex)}`, cx, Math.floor(h * 0.72), { align: 'center', scale: 2, color: '#f2c84a' });
-        drawText(ctx, '< > — ВЫБОР, ENTER — ОТПЛЫТЬ, ESC — ОТМЕНА', cx, h - 14, { align: 'center', color: '#c8bca0' });
+        if (this.touchDevice()) {
+          drawText(ctx, 'КОСНИТЕСЬ ОСТРОВА, ЕЩЁ РАЗ — ОТПЛЫТЬ', cx, h - 40, { align: 'center', color: '#e0d4b8', outline: '#14100c' });
+          const b = this.cancelRect();
+          drawPanel(ctx, b.x, b.y, b.w, b.h, 0.75);
+          drawText(ctx, 'ОТМЕНА', cx, b.y + 5, { align: 'center', color: '#f4ecd8' });
+        } else {
+          drawText(ctx, '< > — ВЫБОР, ENTER — ОТПЛЫТЬ, ESC — ОТМЕНА', cx, h - 16, { align: 'center', color: '#e0d4b8', outline: '#14100c' });
+        }
         break;
       case 'sailing': {
         const t = this.sail?.t ?? 0;
@@ -765,8 +801,8 @@ export class App {
         this.dim(ctx, a);
         drawText(ctx, 'КОРОНА УТРАЧЕНА', cx, Math.floor(h * 0.36), { align: 'center', scale: 2, alpha: a / 0.7 });
         drawText(ctx, 'Правление продолжит наследник.', cx, Math.floor(h * 0.36) + 24, { align: 'center', color: '#d8ccb0', alpha: a / 0.7 });
-        drawText(ctx, 'Открытое самоцветами и разрушенные порталы останутся.', cx, Math.floor(h * 0.36) + 36, { align: 'center', color: '#a89c80', alpha: a / 0.7 });
-        if (this.stateTime > 2) drawText(ctx, 'НАЖМИТЕ ENTER', cx, Math.floor(h * 0.36) + 56, { align: 'center', color: '#f2c84a' });
+        drawText(ctx, 'Всё, открытое за самоцветы, и разрушенные порталы сохранятся.', cx, Math.floor(h * 0.36) + 36, { align: 'center', color: '#b8ac90', alpha: a / 0.7 });
+        if (this.stateTime > 2) drawText(ctx, this.pressHint(), cx, Math.floor(h * 0.36) + 56, { align: 'center', color: '#f2c84a', outline: '#1a1208' });
         break;
       }
       case 'victory': {
@@ -776,6 +812,7 @@ export class App {
         drawText(ctx, 'ПОБЕДА', cx, Math.floor(h * 0.3), { align: 'center', scale: 3, color: '#f2c84a' });
         drawText(ctx, 'Все пять пещер Жадности разрушены.', cx, Math.floor(h * 0.3) + 30, { align: 'center' });
         drawText(ctx, `Правлений: ${this.campaign.reign}. Дней последнего правления: ${this.world.time.day}.`, cx, Math.floor(h * 0.3) + 42, { align: 'center', color: '#d8ccb0' });
+        if (this.stateTime > 3) drawText(ctx, this.pressHint(), cx, Math.floor(h * 0.3) + 64, { align: 'center', color: '#f2c84a', outline: '#1a1208' });
         break;
       }
       default:
@@ -791,6 +828,8 @@ const ABOUT = [
   'ОБ ИГРЕ',
   'КОРОЛЕВСТВО — ПИКСЕЛЬНАЯ МИКРОСТРАТЕГИЯ',
   'ПО МОТИВАМ KINGDOM TWO CROWNS.',
+  'НЕОФИЦИАЛЬНЫЙ ФАНАТСКИЙ ПРОЕКТ, НЕ СВЯЗАН',
+  'С RAW FURY И АВТОРАМИ ОРИГИНАЛА.',
   '',
   'ВСЯ ГРАФИКА, ЗВУК И МУЗЫКА СОЗДАНЫ КОДОМ',
   'С НУЛЯ — БЕЗ ФАЙЛОВ ИЗ ОРИГИНАЛЬНОЙ ИГРЫ.',

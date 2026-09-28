@@ -2,7 +2,7 @@
 // летучие мыши, утки. Кадры маленькие — несколько пикселей, как в оригинале.
 
 import { makeCanvas, type Sprite } from '../engine/sprite';
-import { ellipse, line, px, rect } from './px';
+import { ellipse, line, poly, px, rect } from './px';
 
 export type CritterKind = 'hen' | 'rooster' | 'sheep' | 'cat' | 'crow' | 'owl' | 'butterfly' | 'bat' | 'duck' | 'duckling';
 export type CritterAnim = 'idle' | 'walk' | 'peck' | 'fly' | 'sleep' | 'swim';
@@ -93,12 +93,20 @@ function crow(ctx: CanvasRenderingContext2D, anim: CritterAnim, f: number): void
   const c = '#1e1c22';
   const hi = '#3e3a48';
   if (anim === 'fly') {
-    ellipse(ctx, 4, 4, 2.5, 1, c);
+    // Силуэт в полёте: тело, голова с клювом, хвост веером, широкое крыло.
+    ellipse(ctx, 4, 4, 2.5, 1.2, c);
+    rect(ctx, 6, 3, 2, 2, c);
+    px(ctx, 8, 4, '#4a4440');
+    px(ctx, 0, 3, c);
+    px(ctx, 0, 5, c);
+    px(ctx, 1, 4, c);
     const up = f % 2 === 0;
-    line(ctx, 2, 4, 0, up ? 1 : 6, c);
-    line(ctx, 6, 4, 8, up ? 1 : 6, c);
-    px(ctx, 7, 3, c);
-    px(ctx, 8, 4, '#3a3430');
+    if (up) {
+      poly(ctx, [[2, 4], [5, 4], [2, 0]], c);
+      px(ctx, 2, 0, hi);
+    } else {
+      poly(ctx, [[2, 4], [5, 4], [3, 7]], c);
+    }
     return;
   }
   const peck = anim === 'peck' && f % 2 === 1;
@@ -136,18 +144,25 @@ function owl(ctx: CanvasRenderingContext2D, anim: CritterAnim, f: number): void 
   for (const x of [3, 5]) px(ctx, x, 6, '#a88a62');
 }
 
-function butterfly(ctx: CanvasRenderingContext2D, f: number, color: string): void {
+/** Бабочка сбоку: большое переднее крыло, маленькое заднее, тёмный кончик. */
+function butterfly(ctx: CanvasRenderingContext2D, f: number, color: string, tip: string): void {
   const open = f % 2 === 0;
-  px(ctx, 2, 2, '#2a2020');
+  // Тельце и усик.
   px(ctx, 2, 3, '#2a2020');
+  px(ctx, 3, 3, '#2a2020');
+  px(ctx, 4, 2, '#2a2020');
   if (open) {
-    rect(ctx, 0, 1, 2, 2, color);
-    rect(ctx, 3, 1, 2, 2, color);
+    // Крылья раскрыты: переднее вверх-назад, заднее ниже.
+    rect(ctx, 0, 0, 3, 2, color);
+    px(ctx, 1, 2, color);
+    px(ctx, 0, 0, tip);
     px(ctx, 0, 3, color);
-    px(ctx, 4, 3, color);
+    px(ctx, 1, 3, color);
   } else {
-    rect(ctx, 1, 0, 1, 3, color);
-    rect(ctx, 3, 0, 1, 3, color);
+    // Сложены над спиной — узкий треугольник.
+    px(ctx, 2, 0, color);
+    rect(ctx, 1, 1, 2, 2, color);
+    px(ctx, 1, 0, tip);
   }
 }
 
@@ -224,7 +239,7 @@ export function critterFrames(kind: CritterKind, anim: CritterAnim, variant = 0)
             owl(ctx, anim, f);
             break;
           case 'butterfly':
-            butterfly(ctx, f, ['#f4f0e0', '#f2d44a', '#e88a3a', '#8ab8f0', '#e8a0c0'][variant % 5]);
+            butterfly(ctx, f, ['#e8e0c4', '#f2d44a', '#e88a3a', '#8ab8f0', '#e8a0c0'][variant % 5], ['#3a3430', '#8a6a1a', '#5a2a14', '#3a5a8a', '#8a4a6a'][variant % 5]);
             break;
           case 'bat':
             bat(ctx, f);
