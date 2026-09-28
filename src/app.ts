@@ -160,6 +160,13 @@ export class App {
     world.banner(`ОСТРОВ ${toRoman(world.island.index)}`, undefined, 4);
   }
 
+  /** Перед горячей перезагрузкой: сохранить партию, если идёт игра. */
+  saveForReload(): boolean {
+    if (this.state === 'title' || this.state === 'help' || this.state === 'victory' || this.state === 'gameover') return false;
+    this.autosave();
+    return true;
+  }
+
   private autosave(): void {
     if (this.params.has('nosave')) return;
     saveCampaign(this.campaign, this.world, this.monarchs);
@@ -579,7 +586,8 @@ export class App {
         drawText(ctx, 'КОРОЛЕВСТВО', cx, Math.floor(h * 0.14), { align: 'center', scale: 3, color: '#f4e4b8', alpha: a, outline: '#2a1a10' });
         drawText(ctx, 'ДВЕ КОРОНЫ И ЖАДНОСТЬ', cx, Math.floor(h * 0.14) + 26, { align: 'center', color: '#e8d8b0', alpha: a });
         this.menu.draw(ctx, cx, Math.floor(h * 0.42), 15);
-        drawText(ctx, 'СТРЕЛКИ/WASD — ВЫБОР, ENTER — ОК', cx, h - 12, { align: 'center', color: '#c8bca0', alpha: 0.6 });
+        const touchDevice = this.input.touchSeen || (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches);
+        drawText(ctx, touchDevice ? 'КОСНИТЕСЬ ПУНКТА МЕНЮ' : 'СТРЕЛКИ/WASD — ВЫБОР, ENTER — ОК', cx, h - 12, { align: 'center', color: '#c8bca0', alpha: 0.6 });
         break;
       }
       case 'help':

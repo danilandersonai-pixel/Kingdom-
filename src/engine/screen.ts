@@ -41,10 +41,18 @@ export class Screen {
     this.listeners.push(fn);
   }
 
+  /** Положение холста на странице (CSS-пиксели) — для касаний. */
+  rectLeft = 0;
+  rectTop = 0;
+
   resize(): void {
     const dpr = Math.min(window.devicePixelRatio || 1, 3);
-    const cssW = Math.max(1, window.innerWidth);
-    const cssH = Math.max(1, window.innerHeight);
+    // Размер берём у самого холста: страница может иметь отступы безопасных зон.
+    const rect = this.display.getBoundingClientRect();
+    const cssW = Math.max(1, rect.width || window.innerWidth);
+    const cssH = Math.max(1, rect.height || window.innerHeight);
+    this.rectLeft = rect.left;
+    this.rectTop = rect.top;
     const physW = Math.round(cssW * dpr);
     const physH = Math.round(cssH * dpr);
     this.dpr = dpr;
@@ -94,13 +102,22 @@ export class Screen {
     }
     d.imageSmoothingEnabled = false;
     d.drawImage(this.buffer, this.offX, this.offY, this.w * this.scale, this.h * this.scale);
+    if (this.portrait) {
+      // Подсказка: игра рассчитана на горизонтальный экран.
+      const size = Math.round(14 * this.dpr);
+      d.font = `${size}px system-ui, sans-serif`;
+      d.textAlign = 'center';
+      d.fillStyle = '#e8dcc0';
+      const y = this.offY + this.h * this.scale + size * 2.2;
+      d.fillText('Поверните телефон горизонтально', this.display.width / 2, Math.min(this.display.height - size, y));
+    }
   }
 
   /** Перевод координат указателя (CSS-пиксели) в игровые пиксели. */
   toVirtual(clientX: number, clientY: number): { x: number; y: number } {
     return {
-      x: (clientX * this.dpr - this.offX) / this.scale,
-      y: (clientY * this.dpr - this.offY) / this.scale,
+      x: ((clientX - this.rectLeft) * this.dpr - this.offX) / this.scale,
+      y: ((clientY - this.rectTop) * this.dpr - this.offY) / this.scale,
     };
   }
 

@@ -10,7 +10,8 @@
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "shots": "node scripts/shots.mjs"
+    "shots": "node scripts/shots.mjs",
+    "build:artifact": "vite build && node scripts/artifact.mjs"
   },
   "devDependencies": {
     "playwright-core": "^1.63.0",
