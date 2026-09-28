@@ -166,10 +166,12 @@ export class CentralDock extends Structure {
     const afloat = this.stage === 'launched' || this.stage === 'crewed';
     const bob = afloat ? Math.round(Math.sin(this.world.clock * 1.4) * 1) : 0;
     blit(ctx, boatSprite(stage), sx, gy + (afloat ? 13 + bob : 2));
-    if (this.stage === 'repair') {
-      const pct = Math.floor(this.progress * 100);
-      drawText(ctx, `${pct}%`, sx, gy - 70, { align: 'center', color: '#f4ecd8', alpha: 0.7 });
-    }
+  }
+
+  override drawLabels(ctx: CanvasRenderingContext2D, r: Renderer): void {
+    if (this.stage !== 'repair') return;
+    const pct = Math.floor(this.progress * 100);
+    drawText(ctx, `${pct}%`, r.sx(this.x), r.sy(0) - 70, { align: 'center', color: '#f4ecd8', alpha: 0.7 });
   }
 
   override serialize(): Record<string, unknown> {

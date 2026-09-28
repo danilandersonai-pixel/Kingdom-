@@ -31,6 +31,8 @@ export abstract class Entity {
   draw(_ctx: CanvasRenderingContext2D, _r: Renderer): void {}
   /** Светящиеся части — рисуются поверх ночного затемнения. */
   drawEmissive?(ctx: CanvasRenderingContext2D, r: Renderer): void;
+  /** Надписи и подсказки — поверх воды, чтобы не отражались в реке. */
+  drawLabels?(ctx: CanvasRenderingContext2D, r: Renderer): void;
   /** Источники света. */
   lights?(out: Light[]): void;
   /** Ширина для отсечения при отрисовке. */

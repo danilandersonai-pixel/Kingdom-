@@ -243,6 +243,16 @@ export class World {
     }
   }
 
+  drawLabels(ctx: CanvasRenderingContext2D, r: Renderer): void {
+    const left = r.viewLeft - 60;
+    const right = r.viewRight + 60;
+    for (const e of this.entities) {
+      if (e.dead || !e.drawLabels) continue;
+      if (e.x < left || e.x > right) continue;
+      e.drawLabels(ctx, r);
+    }
+  }
+
   collectLights(out: Light[]): void {
     for (const e of this.entities) if (!e.dead && e.lights) e.lights(out);
   }

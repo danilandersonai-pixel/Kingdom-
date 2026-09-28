@@ -617,6 +617,7 @@ export class App {
       world: (ctx) => w.draw(ctx, r),
       emissive: (ctx) => w.drawEmissive(ctx, r),
       hud: (ctx) => {
+        w.drawLabels(ctx, r);
         if (showHud) this.hud.draw(ctx, r, w, this.monarchs, focus);
         if (showHud && this.input.touchSeen && this.state === 'playing') this.drawTouchHints(ctx);
         if (showHud) this.plaques.draw(ctx, r.w, r.h);

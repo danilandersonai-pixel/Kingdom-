@@ -287,7 +287,7 @@ export class Ghost extends Entity {
     void humanFrames;
   }
 
-  override drawEmissive(ctx: CanvasRenderingContext2D, r: Renderer): void {
+  override drawLabels(ctx: CanvasRenderingContext2D, r: Renderer): void {
     if (this.done && this.fade > 0.6) return;
     // Монетка-подсказка над целью.
     if (this.hintTarget !== null && !this.done) {

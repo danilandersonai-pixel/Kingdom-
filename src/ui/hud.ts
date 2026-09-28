@@ -116,7 +116,7 @@ export class Hud {
   }
 
   private drawBanners(ctx: CanvasRenderingContext2D, r: Renderer, w: World): void {
-    let y = Math.floor(r.h * 0.3);
+    let y = Math.floor(r.h * 0.34);
     for (const b of w.banners) {
       const t = b.time;
       const a = t < 0.6 ? t / 0.6 : t > b.duration - 1 ? Math.max(0, b.duration - t) : 1;
