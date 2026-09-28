@@ -234,9 +234,10 @@ export function installCritters(w: World): void {
         if (f.type !== 'farm' || !near(f.x)) continue;
         const stage = (f as Structure & { stage: string }).stage;
         if (stage === 'site') continue;
-        if (day && !winter) wants.push({ anchor: `hen${f.id}`, kind: 'hen', count: 3, home: f.x - 10, range: 3 * M });
-        if (day && !winter) wants.push({ anchor: `roo${f.id}`, kind: 'rooster', count: 1, home: f.x - 14, range: 2 * M });
-        if (day && stage !== 'well') wants.push({ anchor: `sheep${f.id}`, kind: 'sheep', count: 3, home: f.x + 20, range: 3 * M });
+        // Поля занимают ±55 пикселей от колодца: птицы — слева за полями, овцы — на выгоне справа.
+        if (day && !winter) wants.push({ anchor: `hen${f.id}`, kind: 'hen', count: 3, home: f.x - 66, range: 1.2 * M });
+        if (day && !winter) wants.push({ anchor: `roo${f.id}`, kind: 'rooster', count: 1, home: f.x - 72, range: M });
+        if (day && stage !== 'well') wants.push({ anchor: `sheep${f.id}`, kind: 'sheep', count: 3, home: f.x + 74, range: 1.5 * M });
       }
       // Город: кошка, дети днём, бард ночью у костра.
       if (tc && near(tx)) {

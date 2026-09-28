@@ -293,18 +293,35 @@ export function farmSprite(stage: number, winter: boolean, built: boolean): Spri
       rect(ctx, 3, h - 8, 5, 2, '#c8b890');
       return;
     }
-    rect(ctx, 0, h - 3, w, 3, '#4a3020');
-    for (let x = 0; x < w; x += 2) px(ctx, x, h - 3, '#6a4630');
+    // Вспаханные борозды: гребни светлее, между ними тень.
+    rect(ctx, 0, h - 3, w, 3, '#3e2818');
+    for (let x = 0; x < w; x++) {
+      px(ctx, x, h - 3, x % 3 === 0 ? '#2a1a10' : '#6a4630');
+      if (x % 3 === 1) px(ctx, x, h - 2, '#5a3a24');
+    }
     if (winter) {
-      for (let x = 0; x < w; x++) if (hash2(x, 5) > 0.3) px(ctx, x, h - 4, '#e8eef4');
+      for (let x = 0; x < w; x++) {
+        px(ctx, x, h - 3, x % 3 === 0 ? '#c8d2e0' : '#eef3f8');
+        if (hash2(x, 5) > 0.5) px(ctx, x, h - 4, '#f4f8fc');
+      }
       return;
     }
-    const cols = ['#7a9a3a', '#5a8a2a', '#8aaa3a', '#d8b848'];
-    const heights = [2, 4, 7, 8];
-    for (let x = 1; x < w - 1; x += 2) {
-      const hh = heights[stage] - (hash2(x, stage) > 0.6 ? 1 : 0);
-      line(ctx, x, h - 3, x, h - 3 - hh, cols[stage]);
-      if (stage === 3) px(ctx, x, h - 3 - hh, '#f0d868');
+    // Всходы → зелёная пшеница → золотые колосья.
+    const stalk = ['#6a9a3a', '#5a8a2a', '#6a9432', '#c8a038'][stage];
+    const tip = ['#8aba4a', '#7aaa3a', '#8ab44a', '#f0d868'][stage];
+    const heights = [1, 4, 7, 9];
+    for (let x = 1; x < w - 1; x += 3) {
+      for (const dx of stage === 0 ? [0] : [0, 1]) {
+        const hh = heights[stage] - (hash2(x + dx, stage) > 0.6 ? 1 : 0) - dx;
+        if (hh <= 0) continue;
+        line(ctx, x + dx, h - 3, x + dx, h - 3 - hh, stalk);
+        px(ctx, x + dx, h - 3 - hh, tip);
+        if (stage === 3) {
+          // Колос: пара зёрен по бокам.
+          px(ctx, x + dx - 1, h - 2 - hh, '#e0bc4a');
+          px(ctx, x + dx, h - 2 - hh, '#f0d868');
+        }
+      }
     }
   });
 }
