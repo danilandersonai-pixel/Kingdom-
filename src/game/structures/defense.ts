@@ -96,6 +96,7 @@ export class Wall extends Structure implements WallLike {
       this.destroyed = false;
     } else {
       this.level = this.targetLevel;
+      if (this.level === 1) this.world.emit('moment', 'wall1', 'ПЕРВАЯ СТЕНА', 'Строй, расширяйся, защищай');
       if (this.level === 1) this.world.terrain.block(this.x - 6, this.x + 6, true);
     }
     this.hp = this.maxHpNow;

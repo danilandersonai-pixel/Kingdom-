@@ -340,6 +340,13 @@ export class Audio implements Sfx {
         this.tone(f * 2, 0.35, 'sine', 0.018 * v, { pan, attack: 0.004 });
         break;
       }
+      case 'fanfare': {
+        // Короткие фанфары: до–ми–соль и аккорд.
+        const seq = [523.3, 659.3, 784];
+        seq.forEach((f, i) => this.tone(f, 0.22, 'triangle', 0.07 * v, { pan, attack: 0.01, at: now + i * 0.13, echo: true }));
+        for (const f of [523.3, 659.3, 784, 1046.5]) this.tone(f, 1.1, 'triangle', 0.035 * v, { pan, attack: 0.02, at: now + 0.42, echo: true });
+        break;
+      }
       case 'thunder':
         // Раскат: треск и долгий низкий гул.
         this.noiseBurst(0.35, 0.22 * v, 'lowpass', 2400, { pan, slide: 600 });

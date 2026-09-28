@@ -137,7 +137,6 @@ export class Bomb extends Structure {
       w.add(c);
     }
     w.stolenGems = 0;
-    w.banner('ПЕЩЕРА РАЗРУШЕНА', 'Жадность больше не вернётся на этот остров', 7);
     w.emit('caveCleared');
   }
   lights(out: Light[]): void {

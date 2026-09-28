@@ -442,7 +442,7 @@ export function loadCampaign(): { campaign: Campaign; world: World; monarchs: Mo
     c.destroyedPortals = new Set(cm.destroyedPortals);
     c.openedChests = new Set(cm.openedChests ?? []);
     c.caves = new Set(cm.caves);
-    c.meta = { ...cm.meta, blessings: new Set(cm.meta.blessings), gemUnlocks: new Set(cm.meta.gemUnlocks) };
+    c.meta = { ...cm.meta, blessings: new Set(cm.meta.blessings), gemUnlocks: new Set(cm.meta.gemUnlocks), moments: cm.meta.moments ?? [] };
     c.ruler = randomRuler(Number(String(data.rulerSeed).slice(1)) || cm.seed + 1);
     c.ruler.key = data.rulerSeed;
     let current: World | null = null;

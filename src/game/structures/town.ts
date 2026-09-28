@@ -60,8 +60,8 @@ export class TownCenter extends Structure {
     this.cooldown = this.level === 1 ? 20 : TIME.tcCooldown;
     this.world.sound('bell', this.x, 1);
     this.world.emit('tcUpgraded', this.level, this);
-    if (this.level === 1) this.world.banner('КОРОЛЕВСТВО ОСНОВАНО', 'Костёр горит — королевство живёт');
-    else this.world.banner(TC_TIERS[this.level].name.toUpperCase(), 'Городской центр улучшен');
+    // Уровни 1, 4–7 отмечает памятная табличка (см. app), остальные — надпись.
+    if (this.level === 2 || this.level === 3) this.world.banner(TC_TIERS[this.level].name.toUpperCase(), 'Городской центр улучшен');
   }
 
   override update(dt: number): void {

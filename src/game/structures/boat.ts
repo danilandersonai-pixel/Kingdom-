@@ -125,6 +125,7 @@ export class CentralDock extends Structure {
     this.world.sound('splash', this.x, 1);
     this.world.fx.ripple(this.x, 12);
     this.world.banner('ЛОДКА НА ВОДЕ', 'Колокол позовёт команду');
+    this.world.emit('moment', 'boat', 'ЛОДКА НА ВОДЕ', 'Колокол позовёт команду');
   }
 
   /** Колокол: на борт идут до 3 отрядов, до 3 строителей и 4 лучника. */

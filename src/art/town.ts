@@ -7,7 +7,7 @@ import { makeCanvas, type Sprite } from '../engine/sprite';
 import { hash2 } from '../engine/math';
 import { px, rect, line, poly, shade } from './px';
 
-export const TC_SIZES: Array<[number, number]> = [[20, 8], [26, 32], [38, 38], [48, 54], [54, 64], [66, 76], [76, 88], [80, 92]];
+export const TC_SIZES: Array<[number, number]> = [[20, 8], [26, 32], [38, 38], [48, 54], [52, 60], [54, 64], [66, 76], [76, 88]];
 
 export interface TcDetails {
   /** Окна [x, y, w, h] — ночью светятся. */
@@ -259,7 +259,38 @@ function paintLevel(level: number, ctx: CanvasRenderingContext2D, w: number, h: 
       break;
     }
     case 4: {
-      // Крепость: каменная цитадель с зубцами и донжоном.
+      // Город: большой бревенчатый терем в два яруса, дозорная вышка, частокол.
+      logWall(ctx, 6, h - 30, w - 12, 30, 45);
+      roof(ctx, 6, w - 6, h - 30, h - 40, TILE, 46, 3);
+      plankWall(ctx, cx - 9, h - 50, 18, 14, 47);
+      roof(ctx, cx - 9, cx + 9, h - 50, h - 58, TILE, 48, 2);
+      // Вышка слева.
+      for (const x of [2, 9]) rect(ctx, x, h - 44, 2, 44, WOOD_D);
+      plankWall(ctx, 1, h - 50, 11, 7, 49);
+      roof(ctx, 1, 12, h - 50, h - 56, THATCH, 50, 1);
+      door(ctx, cx - 4, h - 15, 8, 15);
+      win(ctx, d, cx - 6, h - 46, 2, 3);
+      win(ctx, d, cx + 4, h - 46, 2, 3);
+      win(ctx, d, 14, h - 24, 3, 4);
+      win(ctx, d, w - 17, h - 24, 3, 4);
+      masonry(ctx, w - 14, h - 46, 4, 9, 51, STONE, false);
+      d.chimneys.push([w - 12, h - 47]);
+      for (let x = 0; x < w; x += 3) {
+        const hh = 10 + (x % 2);
+        rect(ctx, x, h - hh + 2, 2, hh - 2, WOOD);
+        rect(ctx, x, h - hh + 2, 1, hh - 2, WOOD_L);
+        px(ctx, x, h - hh + 1, WOOD_L);
+        px(ctx, x, h - hh, WOOD_L);
+      }
+      rect(ctx, 0, h - 6, w, 1, WOOD_DD);
+      hangingBanner(ctx, cx - 14, h - 30, 11, banner);
+      hangingBanner(ctx, cx + 10, h - 30, 11, banner);
+      pole(ctx, d, cx, h - 70, 12);
+      pole(ctx, d, 6, h - 64, 8);
+      break;
+    }
+    case 5: {
+      // Форт: каменная цитадель с зубцами и донжоном.
       masonry(ctx, 5, h - 36, w - 10, 36, 41);
       crenels(ctx, 5, h - 36, w - 10, 42);
       masonry(ctx, cx - 9, h - 54, 18, 20, 43, STONE, false);
@@ -275,7 +306,7 @@ function paintLevel(level: number, ctx: CanvasRenderingContext2D, w: number, h: 
       pole(ctx, d, cx, 0, 6);
       break;
     }
-    case 5: {
+    case 6: {
       // Замок: две круглые башни с коническими крышами, донжон, ворота с решёткой.
       masonry(ctx, 10, h - 40, w - 20, 40, 51);
       crenels(ctx, 10, h - 40, w - 20, 52);
@@ -301,10 +332,9 @@ function paintLevel(level: number, ctx: CanvasRenderingContext2D, w: number, h: 
       pole(ctx, d, w - 8, h - 76, 6);
       break;
     }
-    case 6:
     case 7: {
-      // Великий замок; уровень 7 — Железная крепость: железные пояса и тёмный металл.
-      const iron = level === 7;
+      // Железная крепость: великий замок с железными поясами и тёмным металлом.
+      const iron = true;
       const pal = iron ? ['#3e3e48', '#555560', '#6c6c78', '#84848e', '#9e9ea8'] : STONE;
       masonry(ctx, 12, h - 44, w - 24, 44, 71, pal);
       crenels(ctx, 12, h - 44, w - 24, 72, pal);

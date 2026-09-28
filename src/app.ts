@@ -16,6 +16,9 @@ import { Camera } from './game/camera';
 import { Hud } from './ui/hud';
 import { Menu } from './ui/menu';
 import { drawMap } from './ui/map';
+import { drawLogo } from './ui/logo';
+import { Plaques } from './ui/plaque';
+import { DayCycle } from './game/time';
 import { Campaign, randomRuler } from './game/campaign';
 import type { CentralDock } from './game/structures/boat';
 import { CrownOffer } from './game/structures/special';
@@ -58,6 +61,7 @@ export class App {
   /** Начало правления: пока монарх стоит на месте, «вниз» меняет его облик. */
   private reroll: { x: number } | null = null;
   private readonly hooked = new WeakSet<World>();
+  private readonly plaques = new Plaques();
   settings: Settings = { master: 0.8, music: 0.6, difficulty: 'normal' };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -167,13 +171,41 @@ export class App {
       world.time.onDawn.push((d) => {
         if (this.world !== world) return;
         this.hud.showDay(d);
+        if (DayCycle.isBloodMoonDay(d - 1) && this.monarchs.some((m) => m.hasCrown)) this.moment('', 'КРОВАВАЯ ЛУНА ПОЗАДИ', 'Королевство выстояло');
         this.autosave();
       });
+      world.on('moment', (key: string, title: string, sub: string) => this.moment(key, title, sub));
+      world.on('tcUpgraded', (level: number) => {
+        const m: Record<number, [string, string]> = {
+          1: ['КОРОЛЕВСТВО ОСНОВАНО', 'Костёр горит — королевство живёт'],
+          4: ['ГОРОД', 'Королевство растёт'],
+          5: ['КАМЕННЫЙ ФОРТ', 'Камень крепче дерева'],
+          6: ['ЗАМОК', 'Королевство стало твердыней'],
+          7: ['ЖЕЛЕЗНАЯ КРЕПОСТЬ', 'Кузнецы куют мечи рыцарям'],
+        };
+        if (m[level]) this.moment(`tc${level}`, m[level][0], m[level][1]);
+      });
+      world.on('portalDestroyed', () => this.moment('', 'ПОРТАЛ РАЗРУШЕН', 'Жадность отступает'));
+      world.on('caveCleared', () => this.moment('', 'ПЕЩЕРА ВЗОРВАНА', 'Остров свободен от Жадности'));
       world.on('crownTaken', (ownerId: number) => this.onCrownTaken(ownerId));
       world.on('emptyDrop', (m: Monarch) => this.rerollRuler(m));
       world.on('sail', (m: Monarch, dock: CentralDock) => this.openChoose(m, dock));
     }
-    world.banner(`ОСТРОВ ${toRoman(world.island.index)}`, undefined, 4);
+    // Первое прибытие на новый остров — памятный момент, иначе — просто надпись.
+    if (world.island.index > 1 && !this.campaign.meta.moments.includes(`isl${world.island.index}`) && this.state !== 'title') this.moment(`isl${world.island.index}`, `ОСТРОВ ${toRoman(world.island.index)}`, 'Новая земля');
+    else world.banner(`ОСТРОВ ${toRoman(world.island.index)}`, undefined, 4);
+  }
+
+  /** Памятный момент: табличка с салютом и фанфары. Ключ — для разовых (пустой — всегда). */
+  private moment(key: string, title: string, sub: string): void {
+    if (this.state === 'title' || this.params.has('setup')) return;
+    const meta = this.campaign.meta;
+    if (key) {
+      if (meta.moments.includes(key)) return;
+      meta.moments.push(key);
+    }
+    this.plaques.show(title, sub);
+    this.audio.play('fanfare', 0, 0.8);
   }
 
   private rerollRuler(m: Monarch): void {
@@ -234,9 +266,27 @@ export class App {
       { label: 'Новая кампания', action: () => this.newCampaign() },
       { label: () => `Сложность: ${DIFF_NAMES[this.settings.difficulty]}`, action: () => this.cycleDifficulty(1), left: () => this.cycleDifficulty(-1), right: () => this.cycleDifficulty(1) },
       { label: () => `Громкость: ${Math.round(this.settings.master * 10)}`, action: () => this.volume(0.1), left: () => this.volume(-0.1), right: () => this.volume(0.1) },
-      { label: 'Как играть', action: () => this.setState('help') },
+      { label: 'Как играть', action: () => this.showText(HELP) },
+      { label: () => (document.fullscreenElement ? 'Выйти из полного экрана' : 'Во весь экран'), action: () => this.toggleFullscreen() },
+      { label: 'Об игре', action: () => this.showText(ABOUT) },
     ]);
     if (!hasSave()) this.menu.index = 1;
+  }
+
+  private textLines: string[] = [];
+
+  private showText(lines: string[]): void {
+    this.textLines = lines;
+    this.setState('help');
+  }
+
+  private toggleFullscreen(): void {
+    try {
+      if (document.fullscreenElement) void document.exitFullscreen();
+      else void document.documentElement.requestFullscreen?.();
+    } catch {
+      // Встроенная страница может запрещать полноэкранный режим — не страшно.
+    }
   }
 
   private cycleDifficulty(d: number): void {
@@ -457,6 +507,7 @@ export class App {
         }
         break;
     }
+    this.plaques.update(dt, this.screen.w, this.screen.h);
     this.renderer.update(dt);
     const t = this.world.time;
     this.audio.update(dt, {
@@ -568,6 +619,7 @@ export class App {
       hud: (ctx) => {
         if (showHud) this.hud.draw(ctx, r, w, this.monarchs, focus);
         if (showHud && this.input.touchSeen && this.state === 'playing') this.drawTouchHints(ctx);
+        if (showHud) this.plaques.draw(ctx, r.w, r.h);
         if (showHud && this.reroll && this.state === 'playing' && focus === this.monarchs[0]) {
           const hint = this.input.touchSeen ? 'ТАП ПО МОНАРХУ — ДРУГОЙ ПРАВИТЕЛЬ' : 'S ИЛИ ВНИЗ — ДРУГОЙ ПРАВИТЕЛЬ';
           drawText(ctx, hint, Math.floor(r.w / 2), r.h - (this.input.touchSeen ? 46 : 12), { align: 'center', color: '#f4ecd8', alpha: 0.7 });
@@ -637,8 +689,8 @@ export class App {
       case 'title': {
         const a = Math.min(1, this.stateTime * 0.8);
         this.dim(ctx, 0.25 * a);
-        drawText(ctx, 'КОРОЛЕВСТВО', cx, Math.floor(h * 0.14), { align: 'center', scale: 3, color: '#f4e4b8', alpha: a, outline: '#2a1a10' });
-        drawText(ctx, 'ДВЕ КОРОНЫ И ЖАДНОСТЬ', cx, Math.floor(h * 0.14) + 26, { align: 'center', color: '#e8d8b0', alpha: a });
+        const lh = drawLogo(ctx, cx, Math.floor(h * 0.07), a, this.time);
+        drawText(ctx, 'ДВЕ КОРОНЫ И ЖАДНОСТЬ', cx, Math.floor(h * 0.07) + lh + 3, { align: 'center', color: '#e8d8b0', alpha: a });
         this.menu.draw(ctx, cx, Math.floor(h * 0.42), 15);
         const touchDevice = this.input.touchSeen || (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches);
         drawText(ctx, touchDevice ? 'КОСНИТЕСЬ ПУНКТА МЕНЮ' : 'СТРЕЛКИ/WASD — ВЫБОР, ENTER — ОК', cx, h - 12, { align: 'center', color: '#c8bca0', alpha: 0.6 });
@@ -646,7 +698,7 @@ export class App {
       }
       case 'help':
         this.dim(ctx, 0.7);
-        HELP.forEach((line, i) => drawText(ctx, line, cx, 16 + i * 11, { align: 'center', color: i === 0 ? '#f2c84a' : '#e8dcc0' }));
+        this.textLines.forEach((line, i) => drawText(ctx, line, cx, 16 + i * 11, { align: 'center', color: i === 0 ? '#f2c84a' : '#e8dcc0' }));
         break;
       case 'paused':
         this.dim(ctx, 0.62);
@@ -693,6 +745,22 @@ export class App {
 }
 
 const DIFF_NAMES: Record<Difficulty, string> = { peaceful: 'мирная', easy: 'лёгкая', normal: 'обычная', hard: 'трудная', cursed: 'проклятая' };
+
+const ABOUT = [
+  'ОБ ИГРЕ',
+  'КОРОЛЕВСТВО — ПИКСЕЛЬНАЯ МИКРОСТРАТЕГИЯ',
+  'ПО МОТИВАМ KINGDOM TWO CROWNS.',
+  '',
+  'ВСЯ ГРАФИКА, ЗВУК И МУЗЫКА СОЗДАНЫ КОДОМ',
+  'С НУЛЯ — БЕЗ ФАЙЛОВ ИЗ ОРИГИНАЛЬНОЙ ИГРЫ.',
+  'ДЕРЕВЬЯ, ОБЛАКА, ЗАМКИ И ЛЮДИ РИСУЮТСЯ',
+  'ПРОЦЕДУРНО ПРИ ЗАПУСКЕ.',
+  '',
+  'СДЕЛАНО С ПОМОЩЬЮ CLAUDE (ANTHROPIC)',
+  'КАК ИССЛЕДОВАНИЕ ВОЗМОЖНОСТЕЙ ИИ.',
+  '',
+  'НАЖМИТЕ ENTER',
+];
 
 const HELP = [
   'КАК ИГРАТЬ',

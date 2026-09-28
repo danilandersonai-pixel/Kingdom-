@@ -583,7 +583,10 @@ export class Person extends Entity {
     const side = this.side;
     this.setRole(role);
     this.coins = role === 'squire' ? Math.min(keep, PEOPLE.squireCoins) : role === 'knight' ? keep : Math.max(0, keep - 1);
-    if (role === 'knight') this.side = side;
+    if (role === 'knight') {
+      this.side = side;
+      this.world.emit('moment', 'knight', 'ПЕРВЫЙ РЫЦАРЬ', 'Меч и щит королевства');
+    }
     if (role === 'squire') {
       const shieldShop = this.world.all<Shop>('structure').find((s) => s.type === 'shop' && s.kind === 'shield' && Math.abs(s.x - this.x) < 20);
       if (shieldShop && shieldShop.side) this.side = shieldShop.side as -1 | 1;

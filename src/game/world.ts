@@ -41,10 +41,12 @@ export interface CampaignMeta {
   bank: number;
   /** Самоцветы у Хранителя. */
   gemKeeper: number;
+  /** Уже отмеченные памятные моменты (разовые). */
+  moments: string[];
 }
 
 export function defaultMeta(): CampaignMeta {
-  return { tech: 0, blessings: new Set(), gemUnlocks: new Set(), difficulty: 'normal', portalsDestroyed: 0, bank: 0, gemKeeper: 0 };
+  return { tech: 0, blessings: new Set(), gemUnlocks: new Set(), difficulty: 'normal', portalsDestroyed: 0, bank: 0, gemKeeper: 0, moments: [] };
 }
 
 export interface Fx {
