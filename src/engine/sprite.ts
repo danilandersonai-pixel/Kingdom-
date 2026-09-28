@@ -74,9 +74,69 @@ export function silhouette(s: Sprite, color: string): Sprite {
   return { img: c, w: s.w, h: s.h, ax: s.ax, ay: s.ay };
 }
 
+// ——— Зимой на верхних кромках построек лежит снег ———
+let snowMode = false;
+const snowCache = new WeakMap<Sprite, Sprite>();
+
+/** Включить снежный режим для следующих blit (мир включает его для построек зимой). */
+export function setSnowMode(on: boolean): void {
+  snowMode = on;
+}
+
+function snowHash(x: number, y: number): number {
+  let n = (x * 374761393 + y * 668265263) | 0;
+  n = Math.imul(n ^ (n >>> 13), 1274126177);
+  return ((n ^ (n >>> 16)) >>> 0) / 4294967296;
+}
+
+/** Копия спрайта со снегом на крышах, карнизах и зубцах. Узкие штыри
+ *  (древки, шесты) без снега; крутые скаты держат тонкий слой. */
+function snowOf(s: Sprite): Sprite {
+  let o = snowCache.get(s);
+  if (o) return o;
+  const w = s.img.width;
+  const h = s.img.height;
+  const [c, ctx] = makeCanvas(w, h);
+  ctx.drawImage(s.img, 0, 0);
+  const data = ctx.getImageData(0, 0, w, h);
+  const d = data.data;
+  const A = (x: number, y: number) => (x < 0 || y < 0 || x >= w || y >= h ? 0 : d[(y * w + x) * 4 + 3]);
+  const top = new Uint8Array(w * h);
+  for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (A(x, y) >= 200 && A(x, y - 1) < 60) top[y * w + x] = 1;
+  const isTop = (x: number, y: number) => x >= 0 && y >= 0 && x < w && y < h && top[y * w + x] === 1;
+  const set = (x: number, y: number, r: number, g: number, b: number) => {
+    const i = (y * w + x) * 4;
+    d[i] = r;
+    d[i + 1] = g;
+    d[i + 2] = b;
+    d[i + 3] = 255;
+  };
+  for (let y = 0; y < h; y++) {
+    for (let x = 0; x < w; x++) {
+      if (!top[y * w + x]) continue;
+      const flatL = isTop(x - 1, y);
+      const flatR = isTop(x + 1, y);
+      const slope = isTop(x - 1, y - 1) || isTop(x + 1, y - 1) || isTop(x - 1, y + 1) || isTop(x + 1, y + 1);
+      if (!flatL && !flatR && !slope) continue;
+      const k = snowHash(x, y);
+      set(x, y, 238, 244, 252);
+      // На ровном — слой потолще и сугробы, на скате — тонкая кромка.
+      if (flatL && flatR) {
+        if (A(x, y + 1) >= 200 && k > 0.3) set(x, y + 1, 206, 218, 234);
+        if (y > 0 && k > 0.72) set(x, y - 1, 246, 250, 255);
+      } else if (A(x, y + 1) >= 200 && k > 0.7) set(x, y + 1, 214, 224, 238);
+    }
+  }
+  ctx.putImageData(data, 0, 0);
+  o = { img: c, w: s.w, h: s.h, ax: s.ax, ay: s.ay };
+  snowCache.set(s, o);
+  return o;
+}
+
 /** Рисует спрайт так, чтобы точка привязки попала в (x, y). */
 export function blit(ctx: CanvasRenderingContext2D, s: Sprite, x: number, y: number, flip = false, alpha = 1): void {
-  const sp = flip ? flipOf(s) : s;
+  let sp = flip ? flipOf(s) : s;
+  if (snowMode) sp = snowOf(sp);
   const dx = Math.round(x - sp.ax);
   const dy = Math.round(y - sp.ay);
   if (alpha !== 1) {

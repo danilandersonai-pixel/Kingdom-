@@ -6,10 +6,37 @@ import type { Renderer } from '../render/renderer';
 import type { World } from '../game/world';
 import type { Monarch } from '../game/entities/monarch';
 import { blit } from '../engine/sprite';
-import { hudCoin, hudGem, coinSprites, gemSprite, pouchSprite } from '../art/items';
+import { hudGem, coinSprites, gemSprite, pouchSprites, pouchRimY } from '../art/items';
 import { drawText } from '../engine/font';
 import { PURSE } from '../game/config';
 import { clamp, toRoman } from '../engine/math';
+
+/** Места монет в горке: ряды сужаются кверху, лёгкий разброс, разные кадры
+ *  блеска — монеты лежат лицом или чуть повёрнутыми, не ребром. */
+const PILE_FRAMES = [0, 0, 1, 5, 0, 2, 5, 4];
+const pileCache = new Map<number, Array<[number, number, number]>>();
+function pilePositions(n: number): Array<[number, number, number]> {
+  let out = pileCache.get(n);
+  if (out) return out;
+  out = [];
+  let row = 0;
+  while (out.length < n) {
+    const cap = Math.max(3, 11 - row);
+    // Ряд заполняется от середины к краям.
+    const order = Array.from({ length: cap }, (_, k) => k).sort((a, b) => Math.abs(a - (cap - 1) / 2) - Math.abs(b - (cap - 1) / 2));
+    for (const k of order) {
+      if (out.length >= n) break;
+      const h = Math.sin((out.length + 1) * 12.9898) * 43758.5453;
+      const jit = h - Math.floor(h);
+      const x = (k - (cap - 1) / 2) * 4 + (row % 2) * 0.5 + (jit - 0.5) * 1.6;
+      const y = -row * 2.6 - (jit > 0.75 ? 1 : 0);
+      out.push([Math.round(x), Math.round(y), PILE_FRAMES[Math.floor(jit * PILE_FRAMES.length) % PILE_FRAMES.length]]);
+    }
+    row++;
+  }
+  pileCache.set(n, out);
+  return out;
+}
 
 export class Hud {
   private purseAlpha = 0;
@@ -68,39 +95,37 @@ export class Hud {
   private drawPurse(ctx: CanvasRenderingContext2D, r: Renderer, m: Monarch): void {
     if (this.purseAlpha <= 0.01) return;
     const a = this.purseAlpha;
-    const bag = pouchSprite();
+    const bag = pouchSprites();
     const cx = Math.floor(r.w / 2);
-    const top = 4;
+    const top = 3;
     ctx.globalAlpha = a;
-    blit(ctx, bag, cx, top + bag.h);
-    // Монеты лежат горкой внутри мешочка: снизу вверх, по 10 в ряд.
-    const coin = hudCoin();
+    blit(ctx, bag.back, cx, top);
+    // Монеты насыпаны горкой внутри: нижний ряд уходит за передний край,
+    // по бокам горка приподнята — дно у мешка круглое.
+    const frames = coinSprites();
     const gem = hudGem();
-    const perRow = 10;
-    const inner = { left: cx - 27, bottom: top + bag.h - 5 };
-    let slot = 0;
-    const place = (i: number): [number, number] => {
-      const row = Math.floor(i / perRow);
-      const col = i % perRow;
-      const shift = row % 2 === 0 ? 0 : 2.5;
-      return [inner.left + 3 + col * 5.2 + shift, inner.bottom - row * 4];
-    };
-    for (let i = 0; i < m.gems; i++) {
-      const [x, y] = place(slot);
-      blit(ctx, gem, x + 2, y);
-      slot += PURSE.gemSlots;
+    const base = top + Math.round(pouchRimY(0)) + 1;
+    const lift = (x: number) => Math.round(pouchRimY(x) - pouchRimY(0));
+    const pile = pilePositions(PURSE.full);
+    const gemSlots = m.gems * PURSE.gemSlots;
+    const coins = Math.min(m.coins, Math.max(0, PURSE.full - gemSlots));
+    for (let i = 0; i < coins; i++) {
+      const [x, y, v] = pile[i];
+      blit(ctx, frames[v], cx + x, base + y + lift(x));
     }
-    const inside = Math.min(m.coins, Math.max(0, PURSE.full - slot));
-    for (let i = 0; i < inside; i++) {
-      const [x, y] = place(slot + i);
-      blit(ctx, coin, x, y);
+    // Самоцветы лежат поверх монет.
+    for (let i = 0; i < m.gems; i++) {
+      const [x, y] = pile[Math.min(pile.length - 1, coins + i * PURSE.gemSlots + 1)];
+      blit(ctx, gem, cx + x, base + y + lift(x) - 1);
     }
     // Переполнение: монеты горкой над горлышком — вот-вот посыплются.
     const over = m.purseSlots - PURSE.full;
     for (let i = 0; i < over; i++) {
-      const row = Math.floor(i / 6);
-      blit(ctx, coin, cx - 13 + (i % 6) * 5 + (row % 2) * 2, top + 9 - row * 4);
+      const row = Math.floor(i / 5);
+      const jx = ((i * 37) % 5) - 2;
+      blit(ctx, frames[PILE_FRAMES[(i * 5) % PILE_FRAMES.length]], cx - 9 + (i % 5) * 4 + (row % 2) * 2 + Math.round(jx * 0.4), base - 12 - row * 3);
     }
+    blit(ctx, bag.front, cx, top);
     ctx.globalAlpha = 1;
   }
 
@@ -108,15 +133,18 @@ export class Hud {
     const t = this.dayBanner.t;
     const dur = 7;
     if (t > dur || this.dayBanner.day <= 0) return;
-    // Крупное тёмное римское число высоко в небе (в день Кровавой луны — красноватое).
+    // Римское число дня над королевством (в день Кровавой луны — красное).
     const a = t < 1.2 ? t / 1.2 : t > dur - 2 ? (dur - t) / 2 : 1;
     const text = toRoman(this.dayBanner.day);
-    const scale = text.length > 5 ? 3 : 4;
-    drawText(ctx, text, Math.floor(r.w / 2), Math.floor(r.h * 0.19), { align: 'center', scale, color: blood ? '#5a0e10' : '#16120e', alpha: a * 0.85, shadow: null });
+    const scale = text.length > 6 ? 2 : 3;
+    const y = Math.floor(r.h * 0.23);
+    drawText(ctx, 'ДЕНЬ', Math.floor(r.w / 2), y - 11, { align: 'center', color: blood ? '#f0a090' : '#e8dcc0', alpha: a * 0.9, outline: '#1a1410' });
+    drawText(ctx, text, Math.floor(r.w / 2), y, { align: 'center', scale, color: blood ? '#e84a36' : '#f4ecd8', alpha: a, outline: '#1a1410' });
   }
 
   private drawBanners(ctx: CanvasRenderingContext2D, r: Renderer, w: World): void {
-    let y = Math.floor(r.h * 0.34);
+    // Ниже цифры дня, даже на низком экране телефона.
+    let y = Math.max(Math.floor(r.h * 0.34), Math.floor(r.h * 0.23) + 26);
     for (const b of w.banners) {
       const t = b.time;
       const a = t < 0.6 ? t / 0.6 : t > b.duration - 1 ? Math.max(0, b.duration - t) : 1;

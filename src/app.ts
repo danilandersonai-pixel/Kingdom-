@@ -16,6 +16,7 @@ import { Camera } from './game/camera';
 import { Hud } from './ui/hud';
 import { Menu } from './ui/menu';
 import { drawMap } from './ui/map';
+import { drawPanel } from './ui/panel';
 import { drawLogo } from './ui/logo';
 import { Plaques } from './ui/plaque';
 import { DayCycle } from './game/time';
@@ -23,7 +24,7 @@ import { Campaign, randomRuler } from './game/campaign';
 import type { CentralDock } from './game/structures/boat';
 import { CrownOffer } from './game/structures/special';
 import { Coin, DroppedCrown } from './game/entities/pickups';
-import { drawText } from './engine/font';
+import { drawText, textWidth } from './engine/font';
 import { debugSetup } from './game/debug';
 import { makeBot } from './game/bot';
 import { toRoman, clamp } from './engine/math';
@@ -320,7 +321,7 @@ export class App {
       { label: () => `Музыка: ${Math.round(this.settings.music * 10)}`, action: () => this.musicVol(0.1), left: () => this.musicVol(-0.1), right: () => this.musicVol(0.1) },
       { label: () => (this.monarchs.length > 1 ? 'Второй игрок: уйти' : 'Второй игрок: присоединиться'), action: () => this.toggleCoop() },
       {
-        label: () => (this.canSaveNow() ? 'Сохранить и выйти' : hasSave() ? 'Выйти (сохранено утром)' : 'Выйти без сохранения'),
+        label: () => (this.canSaveNow() ? 'Сохранить и выйти' : hasSave() ? 'В меню (сохранено на рассвете)' : 'В меню (ночью не сохранить)'),
         action: () => {
           if (this.canSaveNow()) this.autosave();
           this.openTitle();
@@ -437,7 +438,11 @@ export class App {
         this.stepWorld(dt, false);
         break;
       case 'help':
-        if (p0.pressed('confirm') || p0.pressed('back') || p0.pressed('pause') || this.input.taps.length) this.openTitle();
+        if (p0.pressed('confirm') || p0.pressed('back') || p0.pressed('pause') || this.input.taps.length) {
+          // Назад к тому же титулу: мир и меню не пересоздаются, логотип не мигает заново.
+          this.setState('title');
+          this.stateTime = 5;
+        }
         this.stepWorld(dt, false);
         break;
       case 'playing':
@@ -621,20 +626,23 @@ export class App {
     const lights: Light[] = [];
     w.collectLights(lights);
     r.lights = lights;
-    const showHud = hud && this.state !== 'title' && this.state !== 'help';
+    // На паузе и в заставках игровой интерфейс не просвечивает сквозь затемнение.
+    const showHud = hud && this.state === 'playing';
+    const showLabels = this.state === 'playing' || this.state === 'title';
     r.render(this.atmosphere(), w.time.phase, this.time, {
       sky: (ctx) => this.ambience.drawSky(ctx),
       water: (ctx) => this.ambience.drawWater(ctx),
       world: (ctx) => w.draw(ctx, r),
       emissive: (ctx) => w.drawEmissive(ctx, r),
       hud: (ctx) => {
-        w.drawLabels(ctx, r);
+        if (showLabels) w.drawLabels(ctx, r);
         if (showHud) this.hud.draw(ctx, r, w, this.monarchs, focus);
-        if (showHud && this.input.touchSeen && this.state === 'playing') this.drawTouchHints(ctx);
+        if (showHud && this.touchDevice()) this.drawTouchHints(ctx);
         if (showHud) this.plaques.draw(ctx, r.w, r.h);
-        if (showHud && this.reroll && this.state === 'playing' && focus === this.monarchs[0]) {
-          const hint = this.input.touchSeen ? 'ТАП ПО МОНАРХУ — ДРУГОЙ ПРАВИТЕЛЬ' : 'S ИЛИ ВНИЗ — ДРУГОЙ ПРАВИТЕЛЬ';
-          drawText(ctx, hint, Math.floor(r.w / 2), r.h - (this.input.touchSeen ? 46 : 12), { align: 'center', color: '#f4ecd8', alpha: 0.7 });
+        if (showHud && this.reroll && focus === this.monarchs[0]) {
+          const touch = this.touchDevice();
+          const hint = touch ? 'ТАП ПО МОНАРХУ — ДРУГОЙ ПРАВИТЕЛЬ' : 'S ИЛИ ВНИЗ — ДРУГОЙ ПРАВИТЕЛЬ';
+          drawText(ctx, hint, Math.floor(r.w / 2), r.h - (touch ? 46 : 12), { align: 'center', color: '#f4ecd8', alpha: 0.7 });
         }
       },
     });
@@ -673,6 +681,13 @@ export class App {
     return [this.coopCanvas, this.coopCtx!];
   }
 
+  private coarse: boolean | null = null;
+  /** Сенсорный экран: было касание или основной указатель — палец. */
+  private touchDevice(): boolean {
+    if (this.coarse === null) this.coarse = typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches;
+    return this.input.touchSeen || this.coarse;
+  }
+
   private drawTouchHints(ctx: CanvasRenderingContext2D): void {
     const { w } = this.screen;
     // Кнопка паузы.
@@ -681,8 +696,8 @@ export class App {
     ctx.fillRect(w - 16, 8, 2, 8);
     ctx.fillRect(w - 12, 8, 2, 8);
     ctx.globalAlpha = 1;
-    // Первые секунды — подсказка жестов.
-    if (this.world.time.day === 1 && this.world.time.phase < 0.12) {
+    // Первое утро — подсказка жестов (на телефоне видна сразу, до первого касания).
+    if (this.world.time.day === 1 && this.world.time.phase < 0.3) {
       drawText(ctx, 'ТЯНИТЕ ПАЛЬЦЕМ — ИДТИ, К КРАЮ — ГАЛОП', Math.floor(w / 2), this.screen.h - 34, { align: 'center', color: '#f4ecd8', alpha: 0.8 });
       drawText(ctx, 'СВАЙП ВНИЗ И ДЕРЖАТЬ — ПЛАТИТЬ', Math.floor(w / 2), this.screen.h - 22, { align: 'center', color: '#f4ecd8', alpha: 0.8 });
     }
@@ -701,22 +716,35 @@ export class App {
       case 'title': {
         const a = Math.min(1, this.stateTime * 0.8);
         this.dim(ctx, 0.25 * a);
-        const lh = drawLogo(ctx, cx, Math.floor(h * 0.07), a, this.time);
-        drawText(ctx, 'ДВЕ КОРОНЫ И ЖАДНОСТЬ', cx, Math.floor(h * 0.07) + lh + 3, { align: 'center', color: '#e8d8b0', alpha: a });
-        this.menu.draw(ctx, cx, Math.floor(h * 0.42), 15);
-        const touchDevice = this.input.touchSeen || (typeof matchMedia !== 'undefined' && matchMedia('(pointer: coarse)').matches);
-        drawText(ctx, touchDevice ? 'КОСНИТЕСЬ ПУНКТА МЕНЮ' : 'СТРЕЛКИ/WASD — ВЫБОР, ENTER — ОК', cx, h - 12, { align: 'center', color: '#c8bca0', alpha: 0.6 });
+        const logoY = Math.floor(h * 0.07);
+        const lh = drawLogo(ctx, cx, logoY, a, this.time);
+        const subY = logoY + lh + 3;
+        drawText(ctx, 'ДВЕ КОРОНЫ И ЖАДНОСТЬ', cx, subY, { align: 'center', color: '#e8d8b0', alpha: a });
+        // Меню помещается между подзаголовком и подсказкой внизу при любой высоте экрана.
+        const n = this.menu.items.length;
+        const minY = subY + 20;
+        const maxBottom = h - 18;
+        const lineH = clamp(Math.floor((maxBottom - minY) / n), 11, 15);
+        const menuY = Math.max(minY, Math.min(Math.floor(h * 0.42), maxBottom - n * lineH));
+        this.menu.draw(ctx, cx, menuY, lineH);
+        drawText(ctx, this.touchDevice() ? 'КОСНИТЕСЬ ПУНКТА МЕНЮ' : 'СТРЕЛКИ/WASD — ВЫБОР, ENTER — ОК', cx, h - 12, { align: 'center', color: '#c8bca0', alpha: 0.6 });
         break;
       }
-      case 'help':
-        this.dim(ctx, 0.7);
-        this.textLines.forEach((line, i) => drawText(ctx, line, cx, 16 + i * 11, { align: 'center', color: i === 0 ? '#f2c84a' : '#e8dcc0' }));
+      case 'help': {
+        this.dim(ctx, 0.45);
+        const lines = this.textLines;
+        const tw = Math.max(...lines.map((l) => textWidth(l))) + 28;
+        const lh = 11;
+        const top = Math.max(6, Math.floor(h / 2 - (lines.length * lh) / 2) - 6);
+        drawPanel(ctx, cx - tw / 2, top, tw, lines.length * lh + 12, 0.82);
+        lines.forEach((line, i) => drawText(ctx, line, cx, top + 7 + i * lh, { align: 'center', color: i === 0 ? '#f2c84a' : i === lines.length - 1 ? '#c8bca0' : '#e8dcc0' }));
         break;
+      }
       case 'paused':
-        this.dim(ctx, 0.62);
-        drawText(ctx, 'ПАУЗА', cx, 12, { align: 'center', scale: 2 });
-        drawMap(ctx, w, Math.floor(h * 0.62), this.world, this.campaign, this.monarchs.map((m) => m.x));
-        this.menu.draw(ctx, cx, Math.floor(h * 0.62), 13);
+        this.dim(ctx, 0.55);
+        drawText(ctx, 'ПАУЗА', cx, 8, { align: 'center', scale: 2, color: '#f4ecd8' });
+        drawMap(ctx, w, Math.floor(h * 0.6), this.world, this.campaign, this.monarchs.map((m) => m.x));
+        this.menu.draw(ctx, cx, Math.floor(h * 0.66), 13, 0.7);
         break;
       case 'choose':
         this.dim(ctx, 0.6);

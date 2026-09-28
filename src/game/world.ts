@@ -7,6 +7,7 @@ import { silentSfx } from '../engine/sfx';
 import type { Renderer } from '../render/renderer';
 import type { Light } from '../render/lighting';
 import { Particles } from '../render/particles';
+import { setSnowMode } from '../engine/sprite';
 import { DayCycle } from './time';
 import type { Entity, EntityTag } from './entity';
 import type { Terrain } from './terrain';
@@ -61,6 +62,9 @@ export interface Banner {
   time: number;
   duration: number;
 }
+
+/** Постройки, на которые зимой ложится снег. */
+const SNOWY = new Set(['townCenter', 'wall', 'tower', 'shop', 'farm', 'mill', 'stable', 'bakery', 'ballista', 'catapult', 'hornWall', 'hermitHut', 'dogHouse', 'statue', 'chest', 'camp', 'dock', 'lighthouse', 'bombShop', 'portal', 'rock']);
 
 export class World {
   readonly entities: Entity[] = [];
@@ -230,7 +234,13 @@ export class World {
       visible.push(e);
     }
     visible.sort((a, b) => a.z - b.z || a.x - b.x);
-    for (const e of visible) e.draw(ctx, r);
+    // Зимой на постройках снег (у деревьев он свой, торговцу на голову не сыплем).
+    const winter = this.time.season === 'winter';
+    for (const e of visible) {
+      if (winter) setSnowMode(e.tag === 'structure' && SNOWY.has((e as unknown as { type: string }).type));
+      e.draw(ctx, r);
+    }
+    setSnowMode(false);
   }
 
   drawEmissive(ctx: CanvasRenderingContext2D, r: Renderer): void {

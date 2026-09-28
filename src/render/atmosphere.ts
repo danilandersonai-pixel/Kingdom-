@@ -18,6 +18,8 @@ export interface Atmosphere {
   skyHorizon: RGB;
   /** Цвета слоёв фона от дальнего (0) к ближнему. */
   layers: LayerTone[];
+  /** Тон хвойных в тех же слоях: осенью они не желтеют, зимой — зелень под снегом. */
+  evergreen: LayerTone[];
   cloudBase: RGB;
   cloudLight: RGB;
   cloudShade: RGB;
@@ -137,6 +139,13 @@ const SEASON_TINT: Record<Season, { tint: RGB; amount: number; light: RGB; light
   winter: { tint: hex('#8894a8'), amount: 0.35, light: hex('#e8eef6'), lightAmount: 0.55 },
 };
 
+const EVER_TINT: Record<Season, { tint: RGB; amount: number; light: RGB; lightAmount: number }> = {
+  spring: { tint: hex('#2c4a34'), amount: 0.22, light: hex('#6a9a5a'), lightAmount: 0.2 },
+  summer: { tint: hex('#284232'), amount: 0.2, light: hex('#7a9a58'), lightAmount: 0.12 },
+  autumn: { tint: hex('#2a4430'), amount: 0.32, light: hex('#8a9a5a'), lightAmount: 0.22 },
+  winter: { tint: hex('#2a3c38'), amount: 0.3, light: hex('#e8eef6'), lightAmount: 0.55 },
+};
+
 export interface AtmosphereInput {
   phase: number;
   season: Season;
@@ -182,15 +191,23 @@ export function computeAtmosphere(inp: AtmosphereInput): Atmosphere {
   const nearShade = mix(k.nearShade, st.tint, st.amount * 0.4 * dayness);
   const far = inp.season === 'winter' ? mix(k.far, hex('#c8d2de'), 0.25 * dayness) : k.far;
 
+  const et = EVER_TINT[inp.season];
+  const eNear = mix(k.near, et.tint, et.amount * dayness);
+  const eLight = mix(k.nearLight, et.light, et.lightAmount * dayness);
+  const eShade = mix(k.nearShade, et.tint, et.amount * 0.5 * dayness);
   const layers: LayerTone[] = [];
+  const evergreen: LayerTone[] = [];
   for (let i = 0; i < LAYER_COUNT; i++) {
     // i=0 — самый дальний. Чем дальше слой, тем ближе он к цвету горизонта.
     const depth = 1 - i / (LAYER_COUNT - 1); // 1 — дальний, 0 — ближний
     const toward = mix(far, k.hor, 0.35);
-    const base = mix(near, toward, Math.pow(depth, 0.85));
-    const light = mix(nearLight, mix(k.hor, k.cloudLight, 0.3), Math.pow(depth, 0.8) * 0.9);
-    const shade = mix(nearShade, mix(far, k.top, 0.25), Math.pow(depth, 0.9));
-    layers.push({ base, shade, light });
+    const dB = Math.pow(depth, 0.85);
+    const dL = Math.pow(depth, 0.8) * 0.9;
+    const dS = Math.pow(depth, 0.9);
+    const lightFar = mix(k.hor, k.cloudLight, 0.3);
+    const shadeFar = mix(far, k.top, 0.25);
+    layers.push({ base: mix(near, toward, dB), shade: mix(nearShade, shadeFar, dS), light: mix(nearLight, lightFar, dL) });
+    evergreen.push({ base: mix(eNear, toward, dB), shade: mix(eShade, shadeFar, dS), light: mix(eLight, lightFar, dL) });
   }
 
   const sunH = sunHeight(inp.phase);
@@ -201,6 +218,7 @@ export function computeAtmosphere(inp: AtmosphereInput): Atmosphere {
     skyMid: k.mid,
     skyHorizon: k.hor,
     layers,
+    evergreen,
     cloudBase: k.cloud,
     cloudLight: k.cloudLight,
     cloudShade: mix(k.cloud, k.top, 0.35),

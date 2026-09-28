@@ -8,7 +8,7 @@ import { Ground, GROUND_H } from './ground';
 import { Lighting, type Light } from './lighting';
 import { Particles } from './particles';
 import { Weather } from './weather';
-import { drawWater, type Ripple } from './water';
+import { drawWater, drawLilies, type Ripple } from './water';
 import type { Atmosphere, Season } from './atmosphere';
 import { nightFactor } from './atmosphere';
 import { fxRng } from '../engine/rng';
@@ -70,6 +70,8 @@ export class Renderer {
   private world!: HTMLCanvasElement;
   worldCtx!: CanvasRenderingContext2D;
   private sceneCopy!: HTMLCanvasElement;
+  private fg!: HTMLCanvasElement;
+  private fgCtx!: CanvasRenderingContext2D;
   private sceneCtx!: CanvasRenderingContext2D;
 
   groundY = 189;
@@ -102,6 +104,7 @@ export class Renderer {
     this.horizonY = this.groundY - 12;
     [this.world, this.worldCtx] = makeCanvas(w, h);
     [this.sceneCopy, this.sceneCtx] = makeCanvas(w, this.waterTop);
+    [this.fg, this.fgCtx] = makeCanvas(w, h);
     this.lighting.resize(w, h);
   }
 
@@ -231,8 +234,16 @@ export class Renderer {
 
     this.sceneCtx.clearRect(0, 0, w, this.waterTop);
     this.sceneCtx.drawImage(this.screen.buffer, 0, 0, w, this.waterTop, 0, 0, w, this.waterTop);
-    drawWater(ctx, this.sceneCopy, this.waterTop, w, h, time, a, camX, this.ripples, this.frozen, this.lilies);
-    this.ground.drawReeds(ctx, camX, w, this.waterTop, time);
+    drawWater(ctx, this.sceneCopy, this.waterTop, w, h, time, a, camX, this.ripples, this.frozen);
+    // Передний план у воды (камыш, кувшинки) — свой слой: ночью его
+    // затемняет тот же ночной слой, что и мир, со светом от факелов.
+    const fy = Math.max(0, this.waterTop - 24);
+    const fctx = this.fgCtx;
+    fctx.clearRect(0, fy, w, h - fy);
+    if (this.lilies && this.frozen <= 0.01) drawLilies(fctx, this.waterTop, w, time, a, camX);
+    this.ground.drawReeds(fctx, camX, w, this.waterTop, time);
+    this.lighting.shade(fctx, a, fy, w, h - fy);
+    ctx.drawImage(this.fg, 0, fy, w, h - fy, 0, fy, w, h - fy);
     cb.water?.(ctx);
 
     this.weather.draw(ctx, nightFactor(phase));

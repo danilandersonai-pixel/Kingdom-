@@ -5,7 +5,7 @@
 import { Rng, fxRng } from '../engine/rng';
 import { fbm1, hash2, clamp } from '../engine/math';
 import { makeCanvas, rgb, type RGB, mix, hex } from '../engine/sprite';
-import type { Atmosphere, Season } from './atmosphere';
+import type { Atmosphere, LayerTone, Season } from './atmosphere';
 import { LAYER_COUNT } from './atmosphere';
 import { makeTree, masksToCanvases, makeBush, type TreeKind } from './treegen';
 
@@ -44,6 +44,10 @@ class Layer {
   private maskBase!: HTMLCanvasElement;
   private maskShade!: HTMLCanvasElement;
   private maskLight!: HTMLCanvasElement;
+  /** Отдельные маски хвойных — им свой, вечнозелёный тон. */
+  private everBase!: HTMLCanvasElement;
+  private everShade!: HTMLCanvasElement;
+  private everLight!: HTMLCanvasElement;
   private colored!: HTMLCanvasElement;
   private coloredCtx!: CanvasRenderingContext2D;
   private scratch!: HTMLCanvasElement;
@@ -66,7 +70,7 @@ class Layer {
     const snow = season === 'winter';
     const leafless = season === 'winter';
     const trees: ReturnType<typeof masksToCanvases>[] = [];
-    const metas: Array<{ w: number; h: number; ax: number }> = [];
+    const metas: Array<{ w: number; h: number; ax: number; ever: boolean }> = [];
     const totalWeight = def.kinds.reduce((s, [, w]) => s + w, 0);
     for (let i = 0; i < def.variants; i++) {
       let r = rng.next() * totalWeight;
@@ -81,7 +85,7 @@ class Layer {
       const detail = [0, 0.15, 0.3, 0.5, 0.7][this.index] ?? 0.5;
       const m = kind === 'bush' ? makeBush(rng, h * 2, h, snow) : makeTree(kind, rng, h, snow, leafless && kind !== 'pine' && kind !== 'tallpine', detail);
       trees.push(masksToCanvases(m));
-      metas.push({ w: m.w, h: m.h, ax: m.ax });
+      metas.push({ w: m.w, h: m.h, ax: m.ax, ever: kind === 'pine' || kind === 'tallpine' });
     }
 
     let ridge: ReturnType<typeof this.makeRidge> | null = null;
@@ -92,6 +96,9 @@ class Layer {
     const [b, bc] = makeCanvas(width, height);
     const [s, sc] = makeCanvas(width, height);
     const [l, lc] = makeCanvas(width, height);
+    const [eb, ebc] = makeCanvas(width, height);
+    const [es, esc] = makeCanvas(width, height);
+    const [el, elc] = makeCanvas(width, height);
     let x = 0;
     this.items = [];
     if (ridge) {
@@ -105,15 +112,18 @@ class Layer {
     }
     trees.forEach((t, i) => {
       const m = metas[i];
-      bc.drawImage(t.base, x, height - m.h);
-      sc.drawImage(t.shade, x, height - m.h);
-      lc.drawImage(t.light, x, height - m.h);
+      (m.ever ? ebc : bc).drawImage(t.base, x, height - m.h);
+      (m.ever ? esc : sc).drawImage(t.shade, x, height - m.h);
+      (m.ever ? elc : lc).drawImage(t.light, x, height - m.h);
       this.items.push({ x, w: m.w, h: m.h, ax: m.ax });
       x += m.w + 1;
     });
     this.maskBase = b;
     this.maskShade = s;
     this.maskLight = l;
+    this.everBase = eb;
+    this.everShade = es;
+    this.everLight = el;
     [this.colored, this.coloredCtx] = makeCanvas(width, height);
     [this.scratch, this.scratchCtx] = makeCanvas(width, height);
     this.lastTone = '';
@@ -159,8 +169,8 @@ class Layer {
     return { base, shade, light, h };
   }
 
-  recolor(tone: { base: RGB; shade: RGB; light: RGB }): void {
-    const key = `${tone.base.map(Math.round)}|${tone.shade.map(Math.round)}|${tone.light.map(Math.round)}`;
+  recolor(tone: LayerTone, ever: LayerTone): void {
+    const key = [tone.base, tone.shade, tone.light, ever.base, ever.shade, ever.light].map((c) => c.map(Math.round).join(',')).join('|');
     if (key === this.lastTone) return;
     this.lastTone = key;
     const c = this.coloredCtx;
@@ -168,14 +178,13 @@ class Layer {
     const h = this.colored.height;
     c.globalCompositeOperation = 'source-over';
     c.clearRect(0, 0, w, h);
-    c.drawImage(this.maskBase, 0, 0);
-    c.globalCompositeOperation = 'source-in';
-    c.fillStyle = rgb(tone.base);
-    c.fillRect(0, 0, w, h);
-    c.globalCompositeOperation = 'source-over';
     for (const [mask, color] of [
+      [this.maskBase, tone.base],
       [this.maskShade, tone.shade],
       [this.maskLight, tone.light],
+      [this.everBase, ever.base],
+      [this.everShade, ever.shade],
+      [this.everLight, ever.light],
     ] as const) {
       const s = this.scratchCtx;
       s.globalCompositeOperation = 'source-over';
@@ -295,42 +304,52 @@ export class Background {
   /** Кучевые облака из освещённых «шаров» и перистые полосы. */
   private buildClouds(rng: Rng): void {
     const shapes: Array<{ w: number; h: number; tone: Uint8Array }> = [];
-    const LX = -0.55;
-    const LY = -0.7;
-    const LZ = 0.45;
+    // Свет почти сверху: тона ложатся спокойными слоями, без косой «штриховки».
+    const LX = -0.3;
+    const LY = -0.82;
+    const LZ = 0.5;
     for (let i = 0; i < 12; i++) {
       const stratus = i >= 8;
-      const w = stratus ? rng.int(90, 200) : rng.int(46, 130);
-      const h = stratus ? rng.int(5, 9) : rng.int(Math.max(14, Math.round(w * 0.2)), Math.max(18, Math.round(w * 0.32)));
-      const tone = new Uint8Array(w * h);
-      const zb = new Float32Array(w * h).fill(-1);
+      const w = stratus ? rng.int(90, 200) : rng.int(40, 112);
+      const hb = stratus ? rng.int(5, 9) : rng.int(Math.max(14, Math.round(w * 0.2)), Math.max(18, Math.round(w * 0.32)));
       const circles: Array<[number, number, number]> = [];
       if (stratus) {
+        // Длинная полоса: тоньше к концам, с редкими утолщениями.
         const n = Math.round(w / 9);
         for (let b = 0; b < n; b++) {
           const t = (b + 0.5) / n;
-          const r = h * rng.range(0.5, 0.95) * (0.55 + 0.45 * Math.sin(Math.PI * t));
-          circles.push([t * w, h - r * 0.8, r]);
+          const r = hb * rng.range(0.45, 0.9) * (0.45 + 0.55 * Math.sin(Math.PI * t));
+          circles.push([t * w, hb - r * 0.9 + rng.range(-1, 1), r]);
         }
       } else {
-        // Крупные шары в середине, мелкие по краям; плоское дно.
+        // Крупные шары в середине, мелкие по краям.
         const n = rng.int(5, 9);
         for (let b = 0; b < n; b++) {
           const t = (b + 0.5) / n;
           const bell = Math.sin(Math.PI * t);
-          const r = h * (0.28 + 0.42 * bell) * rng.range(0.85, 1.15);
-          circles.push([t * w + rng.range(-3, 3), h - r * rng.range(0.75, 1.0) - 1, r]);
+          const r = hb * (0.28 + 0.42 * bell) * rng.range(0.85, 1.15);
+          circles.push([t * w + rng.range(-3, 3), hb - r * rng.range(0.75, 1.0) - 1, r]);
         }
         // Верхние «шапки».
         const caps = rng.int(1, 3);
         for (let b = 0; b < caps; b++) {
           const x = rng.range(0.3, 0.7) * w;
-          const r = h * rng.range(0.3, 0.45);
-          circles.push([x, h * rng.range(0.3, 0.5), r]);
+          const r = hb * rng.range(0.3, 0.45);
+          circles.push([x, hb * rng.range(0.3, 0.5), r]);
         }
       }
+      // Холст по реальной высоте шаров: макушки не обрезаются в «полку».
+      const top = Math.min(...circles.map(([, cy, r]) => cy - r));
+      const shift = Math.max(0, Math.ceil(-top) + 1);
+      for (const c of circles) c[1] += shift;
+      const h = hb + shift;
+      const tone = new Uint8Array(w * h);
+      const zb = new Float32Array(w * h).fill(-1);
+      // Низ почти ровный, но концы облака приподняты и скруглены.
+      const base = (x: number) => h - 1 - (stratus ? 0 : Math.round(3 * Math.pow(Math.abs((x + 0.5) / w - 0.5) * 2, 3)));
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
+          if (y > base(x)) continue;
           for (const [cx, cy, r] of circles) {
             const dx = (x + 0.5 - cx) / (r * (stratus ? 2.2 : 1.25));
             const dy = (y + 0.5 - cy) / r;
@@ -342,18 +361,18 @@ export class Background {
             zb[i2] = z;
             const nz = Math.sqrt(1 - d2);
             let lum = 0.3 + 0.7 * Math.max(0, dx * LX + dy * LY + nz * LZ);
-            lum -= Math.max(0, (y - h * 0.62) / h) * 0.9; // тень снизу
-            lum += (hash2(x, y + i * 97) - 0.5) * 0.12;
+            lum -= Math.max(0, (y - shift - hb * 0.62) / hb) * 0.9; // тень снизу
+            lum += (hash2(x >> 1, (y >> 1) + i * 97) - 0.5) * 0.08;
             tone[i2] = lum < 0.38 ? 1 : lum < 0.62 ? 2 : 3;
           }
         }
       }
-      // Плоское дно и кромка со стороны солнца.
+      // Тень у основания и кромка со стороны солнца.
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           const i2 = y * w + x;
           if (!tone[i2]) continue;
-          if (y >= h - 2 && !stratus) tone[i2] = 1;
+          if (!stratus && y >= base(x) - 1 && tone[i2] > 1) tone[i2] = 1;
           const up = y === 0 || !tone[i2 - w];
           const left = x === 0 || !tone[i2 - 1];
           if ((up || left) && tone[i2] >= 2) tone[i2] = 4;
@@ -643,7 +662,7 @@ export class Background {
   /** Слои леса с дымкой между ними. */
   drawLayers(ctx: CanvasRenderingContext2D, a: Atmosphere, camX: number, w: number, groundY: number, force = false): void {
     if (this.recolorTimer <= 0 || force) {
-      for (let i = 0; i < this.layers.length; i++) this.layers[i].recolor(a.layers[i]);
+      for (let i = 0; i < this.layers.length; i++) this.layers[i].recolor(a.layers[i], a.evergreen[i]);
       this.recolorTimer = 0.2;
     }
     for (let i = 0; i < this.layers.length; i++) {

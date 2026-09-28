@@ -40,13 +40,15 @@ export class Lighting {
     d.fillRect(0, 0, w, h);
     d.globalCompositeOperation = 'destination-out';
     const left = camX - w / 2;
+    const lit: Array<[Light, number, number, number, number]> = [];
     for (const l of lights) {
       const sx = l.x - left;
       if (sx < -l.radius || sx > w + l.radius) continue;
       const sy = groundY - l.y;
       const fl = l.flicker ? 1 - l.flicker * 0.5 + Math.sin(time * 13 + l.x) * 0.25 * l.flicker + Math.sin(time * 7.3 + l.x * 0.3) * 0.25 * l.flicker : 1;
       const r = l.radius * (0.94 + 0.06 * fl);
-      const k = Math.min(1, l.intensity * a.glow * fl);
+      // Свет не возвращает полдень: в пятне остаётся немного ночи.
+      const k = Math.min(0.86, l.intensity * a.glow * fl);
       if (k <= 0.01) continue;
       const g = d.createRadialGradient(sx, sy, 0, sx, sy, r);
       g.addColorStop(0, `rgba(0,0,0,${k.toFixed(3)})`);
@@ -54,10 +56,29 @@ export class Lighting {
       g.addColorStop(1, 'rgba(0,0,0,0)');
       d.fillStyle = g;
       d.fillRect(sx - r, sy - r, r * 2, r * 2);
+      lit.push([l, sx, sy, r, k]);
+    }
+    // Тёплый отсвет: освещённое пятно окрашено цветом огня, а не дневным светом.
+    d.globalCompositeOperation = 'source-over';
+    for (const [l, sx, sy, r, k] of lit) {
+      const rr = r * 0.75;
+      const g = d.createRadialGradient(sx, sy, 0, sx, sy, rr);
+      g.addColorStop(0, rgb(l.color, 0.2 * k));
+      g.addColorStop(1, rgb(l.color, 0));
+      d.fillStyle = g;
+      d.fillRect(sx - rr, sy - rr, rr * 2, rr * 2);
     }
     worldCtx.globalCompositeOperation = 'source-atop';
     worldCtx.drawImage(this.dark, 0, 0);
     worldCtx.globalCompositeOperation = 'source-over';
+  }
+
+  /** Тот же ночной слой (с пятнами света) — поверх переднего плана у воды. */
+  shade(fg: CanvasRenderingContext2D, a: Atmosphere, y: number, w: number, h: number): void {
+    if (a.overlayAlpha < 0.01) return;
+    fg.globalCompositeOperation = 'source-atop';
+    fg.drawImage(this.dark, 0, y, w, h, 0, y, w, h);
+    fg.globalCompositeOperation = 'source-over';
   }
 
   /** Тёплые ореолы — аддитивно поверх всего кадра. */

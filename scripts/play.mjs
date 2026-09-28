@@ -35,7 +35,9 @@ mkdirSync('shots', { recursive: true });
 const server = await createServer({ server: { port: 5198, host: '127.0.0.1' }, logLevel: 'error' });
 await server.listen();
 const browser = await chromium.launch({ executablePath: '/opt/pw-browsers/chromium', args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader', '--ignore-gpu-blocklist'] });
-const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1 });
+// TOUCH=1 — телефон: сенсорный экран и «грубый» указатель (pointer: coarse).
+const touch = process.env.TOUCH === '1';
+const page = await browser.newPage({ viewport: { width, height }, deviceScaleFactor: 1, hasTouch: touch, isMobile: touch });
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e.stack || e)));
 page.on('console', (m) => {

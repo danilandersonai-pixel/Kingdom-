@@ -22,7 +22,6 @@ export function drawWater(
   camX: number,
   ripples: Ripple[],
   frozen = 0,
-  lilies = false,
 ): void {
   const waterH = h - waterTop;
   ctx.fillStyle = rgb(a.waterDeep);
@@ -100,34 +99,6 @@ export function drawWater(
     return;
   }
 
-  // Кувшинки у берега: листья-блюдца и редкие цветы, чуть покачиваются.
-  if (lilies) {
-    const left0 = camX - w / 2;
-    for (let c = Math.floor(left0 / 70) - 1; c <= Math.floor((left0 + w) / 70) + 1; c++) {
-      if (hash2(c, 301) > 0.3) continue;
-      const n = 1 + Math.floor(hash2(c, 302) * 3);
-      for (let k = 0; k < n; k++) {
-        const x = Math.round(c * 70 + hash2(c, 303 + k) * 50 - left0 + k * 6);
-        const y = waterTop + 3 + Math.floor(hash2(c, 310 + k) * 9);
-        const bob = Math.round(Math.sin(time * 1.1 + c + k) * 0.6);
-        const pw = 4 + Math.floor(hash2(c, 320 + k) * 3);
-        ctx.fillStyle = '#2e5a2a';
-        ctx.fillRect(x + bob, y, pw, 1);
-        ctx.fillStyle = '#467a36';
-        ctx.fillRect(x + bob + 1, y - 1, pw - 2, 1);
-        // Вырез листа.
-        ctx.fillStyle = rgb(a.waterDeep);
-        ctx.fillRect(x + bob + (pw >> 1), y, 1, 1);
-        if (hash2(c, 330 + k) > 0.6) {
-          ctx.fillStyle = hash2(c, 340 + k) > 0.5 ? '#f4d0e0' : '#f6f2ea';
-          ctx.fillRect(x + bob + 1, y - 2, 2, 1);
-          ctx.fillStyle = '#f2d44a';
-          ctx.fillRect(x + bob + 1, y - 2, 1, 1);
-        }
-      }
-    }
-  }
-
   // Туман над водой на рассвете и в сырую погоду.
   if (a.fogAlpha > 0.14) {
     const k = Math.min(0.5, (a.fogAlpha - 0.14) * 2.2);
@@ -175,5 +146,34 @@ export function drawWater(
     ctx.fillStyle = rgb(glint, 0.35 * rp.life);
     const y = waterTop + 2 + Math.floor(hash2(Math.floor(rp.x), 1) * Math.min(20, waterH - 4));
     ctx.fillRect(Math.round(sx - rad), y, Math.max(1, Math.round(rad * 2)), 1);
+  }
+}
+
+/** Кувшинки у берега: листья-блюдца и редкие цветы, чуть покачиваются.
+ *  Рисуются на передний план у воды — ночью их затемняет общий слой света. */
+export function drawLilies(ctx: CanvasRenderingContext2D, waterTop: number, w: number, time: number, a: Atmosphere, camX: number): void {
+  const left0 = camX - w / 2;
+  for (let c = Math.floor(left0 / 70) - 1; c <= Math.floor((left0 + w) / 70) + 1; c++) {
+    if (hash2(c, 301) > 0.3) continue;
+    const n = 1 + Math.floor(hash2(c, 302) * 3);
+    for (let k = 0; k < n; k++) {
+      const x = Math.round(c * 70 + hash2(c, 303 + k) * 50 - left0 + k * 6);
+      const y = waterTop + 3 + Math.floor(hash2(c, 310 + k) * 9);
+      const bob = Math.round(Math.sin(time * 1.1 + c + k) * 0.6);
+      const pw = 4 + Math.floor(hash2(c, 320 + k) * 3);
+      ctx.fillStyle = '#2e5a2a';
+      ctx.fillRect(x + bob, y, pw, 1);
+      ctx.fillStyle = '#467a36';
+      ctx.fillRect(x + bob + 1, y - 1, pw - 2, 1);
+      // Вырез листа.
+      ctx.fillStyle = rgb(a.waterDeep);
+      ctx.fillRect(x + bob + (pw >> 1), y, 1, 1);
+      if (hash2(c, 330 + k) > 0.6) {
+        ctx.fillStyle = hash2(c, 340 + k) > 0.5 ? '#f4d0e0' : '#f6f2ea';
+        ctx.fillRect(x + bob + 1, y - 2, 2, 1);
+        ctx.fillStyle = '#f2d44a';
+        ctx.fillRect(x + bob + 1, y - 2, 1, 1);
+      }
+    }
   }
 }

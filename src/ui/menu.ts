@@ -2,6 +2,7 @@
 
 import { drawText, textWidth } from '../engine/font';
 import type { Input } from '../engine/input';
+import { drawPanel } from './panel';
 
 export interface MenuItem {
   label: string | (() => string);
@@ -57,24 +58,36 @@ export class Menu {
     }
   }
 
-  draw(ctx: CanvasRenderingContext2D, cx: number, y0: number, lineH = 16): void {
+  draw(ctx: CanvasRenderingContext2D, cx: number, y0: number, lineH = 16, panelAlpha = 0.62): void {
     this.rects = [];
+    // Все пункты одной ширины — по самому длинному; под ними доска.
+    const labels = this.items.map((_, i) => this.label(i));
+    const w = Math.max(130, ...labels.map((t) => textWidth(t) + 30));
+    const left = Math.round(cx - w / 2);
+    if (panelAlpha > 0) drawPanel(ctx, left - 6, y0 - 9, w + 12, this.items.length * lineH + 11, panelAlpha);
     this.items.forEach((it, i) => {
-      const text = this.label(i);
+      const text = labels[i];
       const sel = i === this.index;
       const dis = it.disabled?.() ?? false;
       const y = y0 + i * lineH;
-      const w = Math.max(textWidth(text) + 24, 120);
-      this.rects.push({ x: cx - w / 2, y: y - 4, w, h: lineH });
+      this.rects.push({ x: left, y: y - 4, w, h: lineH });
       if (sel) {
-        ctx.globalAlpha = 0.35;
-        ctx.fillStyle = '#1a1208';
-        ctx.fillRect(Math.round(cx - w / 2), y - 3, w, lineH - 3);
+        ctx.globalAlpha = 0.22;
+        ctx.fillStyle = '#f2c84a';
+        ctx.fillRect(left, y - 3, w, lineH - 3);
         ctx.globalAlpha = 1;
-        drawText(ctx, '>', Math.round(cx - w / 2) + 4, y, { color: '#f2c84a' });
-        drawText(ctx, '<', Math.round(cx + w / 2) - 8, y, { color: '#f2c84a' });
+        drawText(ctx, '>', left + 4, y, { color: '#f2c84a' });
+        drawText(ctx, '<', left + w - 8, y, { color: '#f2c84a' });
       }
-      drawText(ctx, text, cx, y, { align: 'center', color: dis ? '#8a8070' : sel ? '#fff4d8' : '#d8ccb0' });
+      drawText(ctx, text, cx, y, { align: 'center', color: dis ? '#948a78' : sel ? '#fff4d8' : '#e0d4b8', shadow: dis ? null : undefined });
+      // Недоступный пункт перечёркнут тонкой линией — видно, что он есть, но закрыт.
+      if (dis) {
+        const tw = textWidth(text);
+        ctx.fillStyle = '#948a78';
+        ctx.globalAlpha = 0.6;
+        ctx.fillRect(Math.round(cx - tw / 2) - 2, y + 3, tw + 4, 1);
+        ctx.globalAlpha = 1;
+      }
     });
   }
 }

@@ -36,7 +36,8 @@ export class Portal extends Structure {
   }
 
   get drawRadius(): number {
-    return this.kind === 'cliff' ? 150 : 45;
+    // Утёс уходит далеко наружу от пещеры — не отсекать его раньше времени.
+    return this.kind === 'cliff' ? 300 : 45;
   }
 
   get alive(): boolean {
