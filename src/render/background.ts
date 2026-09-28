@@ -502,7 +502,8 @@ export class Background {
     // Северное сияние зимними ночами.
     if (a.aurora > 0.05) this.drawAurora(ctx, a, w, horizonY, time, camX);
 
-    // Солнце и зарево у горизонта на закате/рассвете.
+    // Солнце и зарево у горизонта на закате/рассвете (за тучами — бледнее).
+    ctx.globalAlpha = a.clear;
     if (a.sunH > -0.25) {
       const sx = Math.round(w * a.sunX);
       const sy = Math.round(horizonY - 8 - a.sunH * (horizonY - 34));
@@ -522,6 +523,7 @@ export class Background {
       this.glow(ctx, mx, my, a.bloodMoon ? 70 : 26 + lit * 18, a.moonColor, (a.bloodMoon ? 0.4 : 0.18) * (0.3 + 0.7 * lit));
       this.moon(ctx, mx, my, r, a);
     }
+    ctx.globalAlpha = 1;
 
     // Облака: дальний слой бледнее и медленнее.
     this.recolorClouds(a);

@@ -340,6 +340,12 @@ export class Audio implements Sfx {
         this.tone(f * 2, 0.35, 'sine', 0.018 * v, { pan, attack: 0.004 });
         break;
       }
+      case 'thunder':
+        // Раскат: треск и долгий низкий гул.
+        this.noiseBurst(0.35, 0.22 * v, 'lowpass', 2400, { pan, slide: 600 });
+        this.noiseBurst(3.2, 0.5 * v, 'lowpass', 260, { pan, slide: 60, attack: 0.25, at: now + 0.05 });
+        this.noiseBurst(1.6, 0.3 * v, 'lowpass', 180, { pan, slide: 50, attack: 0.1, at: now + 0.9 });
+        break;
       case 'cluck':
         this.tone(640, 0.05, 'square', 0.025 * v, { pan, slide: 520 });
         this.tone(600, 0.06, 'square', 0.022 * v, { pan, slide: 480, at: now + 0.09 });

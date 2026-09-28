@@ -57,7 +57,7 @@ export function drawWater(
   const sunLow = a.sunH > -0.05 ? 1 - Math.min(1, Math.max(0, a.sunH) / 0.5) : 0;
   const moonLit = a.moonH > 0 ? (a.bloodMoon ? 1 : (1 - Math.cos(a.moonPhase * Math.PI * 2)) / 2) * Math.min(1, a.moonH * 3) : 0;
   const useSun = a.sunH > -0.05;
-  const strength = (useSun ? 0.18 + sunLow * 0.5 : moonLit * 0.45) * (1 - frozen * 0.6);
+  const strength = (useSun ? 0.18 + sunLow * 0.5 : moonLit * 0.45) * (1 - frozen * 0.6) * a.clear;
   if (strength > 0.03) {
     const col = useSun ? mix(a.sunColor, hex('#ffb060'), sunLow * 0.5) : a.moonColor;
     const cx = w * (useSun ? a.sunX : a.moonX);

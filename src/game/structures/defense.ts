@@ -16,6 +16,13 @@ function tcLevel(s: Structure): number {
   return tc ? tc.level : 0;
 }
 
+/** Стройка закончена: облачко пыли и искорки. */
+function completionPuff(s: Structure): void {
+  const p = s.world.fx.particles;
+  p.burst(s.x, 3, 12, { color: '#b8a88a', speed: 28, spread: Math.PI, life: 0.9, drag: 2.2, size: 2 });
+  p.burst(s.x, 14, 6, { color: '#fff4c8', speed: 24, spread: Math.PI * 2, life: 0.6, emissive: true });
+}
+
 export class Wall extends Structure implements WallLike {
   readonly type = 'wall' as const;
   /** Уровень построен, но стена разрушена — нужна отстройка. */
@@ -83,6 +90,7 @@ export class Wall extends Structure implements WallLike {
   }
 
   override finishBuild(): void {
+    completionPuff(this);
     if (this.rebuilding) {
       this.rebuilding = false;
       this.destroyed = false;
@@ -254,6 +262,7 @@ export class Tower extends Structure {
   }
 
   override finishBuild(): void {
+    completionPuff(this);
     this.level = this.targetLevel;
     if (this.level === 1) this.world.terrain.block(this.x - 7, this.x + 7, true);
     this.world.jobs.removeFor(this, 'build');

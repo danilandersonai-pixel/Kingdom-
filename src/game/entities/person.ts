@@ -90,6 +90,7 @@ export class Person extends Entity {
   private waveT = 0;
   private waveCd = fxRng.range(2, 8);
   private waveDir: 1 | -1 = 1;
+  private breathT = fxRng.range(0, 2);
   kingdomColor = '#a82a2a';
 
   constructor(x: number, role: Role, variant: number) {
@@ -288,6 +289,11 @@ export class Person extends Entity {
     const w = this.world;
     if (this.hop > 0) this.hop -= dt;
     if (this.aura > 0) this.aura -= dt;
+    // Пар изо рта на морозе.
+    if (w.time.season === 'winter' && (this.breathT -= dt) <= 0) {
+      this.breathT = fxRng.range(1.8, 3);
+      if (!this.aboard && !this.capturedBy) w.fx.particles.spawn({ x: this.x + this.facing * 3, y: this.y + 12, vx: this.facing * 4, vy: 3, life: 0.9, max: 0.9, color: 'rgba(235,242,250,0.5)', size: 1, drag: 1.2, wobble: 2 });
+    }
     // Помахать монарху, который проезжает мимо (только стоящие без дела, днём).
     if (this.waveT > 0) this.waveT -= dt;
     else if ((this.waveCd -= dt) <= 0) {

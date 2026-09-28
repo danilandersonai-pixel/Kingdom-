@@ -502,9 +502,21 @@ export class App {
   }
 
   private weatherTimer = 30;
+  private thunderAt = -1;
+
   private updateWeather(dt: number): void {
     const w = this.world;
     const wx = this.renderer.weather;
+    w.weatherWet = wx.kind === 'rain' && wx.intensity > 0.3;
+    // Гроза: в сильный дождь — молния и гром с задержкой.
+    if (wx.kind === 'rain' && wx.intensity > 0.6 && Math.random() < dt * 0.06) {
+      this.renderer.lightning();
+      this.thunderAt = this.time + 0.4 + Math.random() * 1.8;
+    }
+    if (this.thunderAt > 0 && this.time >= this.thunderAt) {
+      this.thunderAt = -1;
+      this.audio.play('thunder', 0, 0.9);
+    }
     if (w.time.season === 'winter') {
       if (wx.kind !== 'snow') wx.set('snow', 0.6);
       return;

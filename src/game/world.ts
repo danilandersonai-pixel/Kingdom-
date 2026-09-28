@@ -90,6 +90,8 @@ export class World {
   caveCleared = false;
   /** Самоцветы, унесённые Жадностью (вернёт взрыв пещеры). */
   stolenGems = 0;
+  /** Идёт дождь — земля сырая (для эффектов). */
+  weatherWet = false;
   /** Рог созвал защитников к стене этой стороны (до утра). */
   hornCall: -1 | 1 | null = null;
   layout: IslandLayout | null = null;

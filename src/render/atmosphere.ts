@@ -45,6 +45,8 @@ export interface Atmosphere {
   /** Экранные доли X солнца и луны (свет спрайтов — слева). */
   sunX: number;
   moonX: number;
+  /** Насколько светила видны сквозь тучи (0..1). */
+  clear: number;
 }
 
 interface Key {
@@ -220,6 +222,7 @@ export function computeAtmosphere(inp: AtmosphereInput): Atmosphere {
     aurora: inp.season === 'winter' && inp.blood <= 0 ? night * (1 - oc) * (0.55 + 0.45 * Math.sin((inp.day ?? 0) * 1.7)) : 0,
     sunX: 0.27,
     moonX: 0.72,
+    clear: 1 - oc * 0.92,
   };
 }
 

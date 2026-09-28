@@ -41,6 +41,24 @@ export class Renderer {
   rays = 0;
   /** Кувшинки на воде (весна и лето). */
   lilies = false;
+  /** Вспышка молнии 0..1 и сама молния (точки зигзага в экранных координатах). */
+  flash = 0;
+  private bolt: Array<[number, number]> = [];
+
+  /** Ударить молнией в небе над лесом. */
+  lightning(): void {
+    const { w } = this.screen;
+    let x = fxRng.range(w * 0.1, w * 0.9);
+    let y = 0;
+    this.bolt = [[x, y]];
+    const bottom = this.horizonY - fxRng.range(10, 40);
+    while (y < bottom) {
+      y += fxRng.range(4, 11);
+      x += fxRng.range(-7, 7);
+      this.bolt.push([x, Math.min(y, bottom)]);
+    }
+    this.flash = 1;
+  }
   /** Атмосфера последнего кадра (для объектов, которые рисуют воду сами). */
   atmos: Atmosphere | null = null;
 
@@ -114,11 +132,12 @@ export class Renderer {
   }
 
   update(dt: number): void {
+    if (this.flash > 0) this.flash = Math.max(0, this.flash - dt * 3.2);
     this.particles.update(dt);
     this.bg.update(dt);
     const camDx = (this.camX - this.lastCamX) / Math.max(dt, 1e-4);
     this.lastCamX = this.camX;
-    this.weather.update(dt, this.w, this.h, this.waterTop, camDx, this.ripples, this.camX);
+    this.weather.update(dt, this.w, this.h, this.waterTop, camDx, this.ripples, this.camX, this.groundY);
     for (const r of this.ripples) r.life -= dt * 1.6;
     for (let i = this.ripples.length - 1; i >= 0; i--) if (this.ripples[i].life <= 0) this.ripples.splice(i, 1);
     if (this.ripples.length > 120) this.ripples.splice(0, this.ripples.length - 120);
@@ -159,6 +178,15 @@ export class Renderer {
       ctx.lineTo(x + 70, this.groundY);
       ctx.closePath();
       ctx.fill();
+      // Пылинки, медленно кружащие в луче.
+      for (let k = 0; k < 5; k++) {
+        const u = (Math.sin(time * 0.13 * (k + 1) + c * 3.1 + k) + 1) / 2;
+        const yy = top + 40 + u * (this.groundY - top - 44);
+        const along = (yy - top) / (this.groundY - top);
+        const xx = x + along * 70 + (0.2 + 0.6 * ((Math.sin(time * 0.21 + k * 2.3 + c) + 1) / 2)) * width;
+        ctx.fillStyle = rgb(col, Math.min(1, alpha * 6) * (0.5 + 0.5 * Math.sin(time * 2 + k)));
+        ctx.fillRect(Math.round(xx), Math.round(yy), 1, 1);
+      }
     }
     ctx.globalCompositeOperation = 'source-over';
   }
@@ -174,6 +202,16 @@ export class Renderer {
 
     this.bg.drawSky(ctx, a, camX, w, this.horizonY, time);
     cb.sky?.(ctx);
+    // Молния за лесом.
+    if (this.flash > 0.55 && this.bolt.length) {
+      ctx.fillStyle = '#f4f0ff';
+      for (let i = 1; i < this.bolt.length; i++) {
+        const [x0, y0] = this.bolt[i - 1];
+        const [x1, y1] = this.bolt[i];
+        const n = Math.max(1, Math.ceil(Math.abs(y1 - y0)));
+        for (let k = 0; k <= n; k++) ctx.fillRect(Math.round(x0 + ((x1 - x0) * k) / n), Math.round(y0 + ((y1 - y0) * k) / n), 1, 1);
+      }
+    }
     this.bg.drawLayers(ctx, a, camX, w, this.groundY);
     if (this.rays > 0.01 && a.sunH > 0.05) this.drawRays(ctx, a, camX, time);
 
@@ -198,6 +236,11 @@ export class Renderer {
     cb.water?.(ctx);
 
     this.weather.draw(ctx, nightFactor(phase));
+    // Вспышка молнии на весь экран.
+    if (this.flash > 0) {
+      ctx.fillStyle = `rgba(230,236,255,${(this.flash * 0.32).toFixed(3)})`;
+      ctx.fillRect(0, 0, w, h);
+    }
     cb.hud?.(ctx);
   }
 }

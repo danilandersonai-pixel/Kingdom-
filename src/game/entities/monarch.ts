@@ -33,6 +33,7 @@ export class Monarch extends Entity {
   input: PlayerInput | null = null;
   rider: RiderLook = KING;
   riderKey = 'k0';
+  private breath = 0;
   mount: MountDef = MOUNTS.horse;
 
   coins = 0;
@@ -250,10 +251,24 @@ export class Monarch extends Entity {
       if (this.stepTimer <= 0) {
         this.stepTimer = this.galloping ? 0.36 : 0.5;
         w.sound(this.galloping ? 'gallop' : 'hoof', this.x, this.galloping ? 0.45 : 0.3);
-        if (this.galloping) {
-          w.fx.particles.burst(this.x - this.facing * 8, 1, 3, { color: w.time.season === 'winter' ? '#e8eef4' : '#8a7a62', speed: 14, spread: 1.2, life: 0.5, gravity: 30 });
+        const winter = w.time.season === 'winter';
+        const p = w.fx.particles;
+        if (winter) {
+          // Следы копыт на снегу (держатся полминуты) и снежная пыль.
+          for (const off of [-6, 5]) p.spawn({ x: this.x + off * this.facing, y: 0, life: 30, max: 30, color: 'rgba(120,136,168,0.7)', settle: true });
+          if (this.galloping) p.burst(this.x - this.facing * 8, 2, 5, { color: '#f4f8fc', speed: 22, spread: 1.4, life: 0.7, gravity: 40, drag: 1.5 });
+        } else if (this.galloping) {
+          // Пыль клубами, в дождь — брызги грязи, на лугу — травинки.
+          const wet = w.weatherWet ?? false;
+          p.burst(this.x - this.facing * 8, 2, 4, { color: wet ? '#4a3a2a' : '#a08a6a', speed: wet ? 26 : 12, spread: 1.4, life: wet ? 0.5 : 0.9, gravity: wet ? 120 : 6, drag: wet ? 0 : 2.2, size: wet ? 1 : 2 });
+          if (!wet && w.terrain.grass[w.terrain.cell(this.x)] > 0.5) p.burst(this.x - this.facing * 6, 2, 2, { color: '#6e9a40', speed: 20, spread: 1, life: 0.6, gravity: 90 });
         }
       }
+    }
+
+    if (w.time.season === 'winter' && (this.breath -= dt) <= 0) {
+      this.breath = this.galloping ? 0.7 : 1.8;
+      w.fx.particles.spawn({ x: this.x + this.facing * 17, y: 15, vx: this.facing * 6 + this.speed * 0.3, vy: 3, life: 1.1, max: 1.1, color: 'rgba(235,242,250,0.55)', size: 2, drag: 1.2, wobble: 3 });
     }
 
     if (c.ability || (this.galloping && (this.mount.ability === 'aura' || this.mount.ability === 'dash'))) w.emit('mountAbility', this, c.ability);
