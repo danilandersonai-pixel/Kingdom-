@@ -165,9 +165,14 @@ export function drawMountFrame(ctx: CanvasRenderingContext2D, anim: MountAnim, t
     const hx = X(leg.hipX);
     const thick = m.kind === 'bear' ? 1.6 : 1;
     limb(ctx, hx, Y(hipY + 1.2), X(p.kx), Y(ky), (leg.front ? 2.6 : 3.2) * S * thick, 1.8 * S * thick, col);
-    limb(ctx, X(p.kx), Y(ky), X(p.fx), Y(fy + 1), 1.6 * S * thick, 1.4 * S * thick, col);
+    // У грифона передние лапы орлиные: жёлтые, с когтями.
+    const talon = m.kind === 'griffin' && leg.front;
+    limb(ctx, X(p.kx), Y(ky), X(p.fx), Y(fy + 1), 1.6 * S * thick, 1.4 * S * thick, talon ? (leg.near ? '#c89a30' : '#98742a') : col);
     if (m.socks && leg.near) line(ctx, X(p.fx), Y(fy + 1.8), X(p.fx), Y(fy + 1), m.socks);
-    rect(ctx, X(p.fx) - 1, Y(fy + 0.6), 2 * S, 1, m.hoof);
+    if (talon) {
+      rect(ctx, X(p.fx) - 1, Y(fy + 0.6), 3, 1, '#2a1c10');
+      px(ctx, X(p.fx) + 2, Y(fy + 0.2), '#2a1c10');
+    } else rect(ctx, X(p.fx) - 1, Y(fy + 0.6), 2 * S, 1, m.hoof);
   };
 
   // Плащ всадника — позади всего.
@@ -240,14 +245,26 @@ export function drawMountFrame(ctx: CanvasRenderingContext2D, anim: MountAnim, t
     px(ctx, X(headTop[0] + 1.5), Y(headTop[1] - 2.6), '#f2d040');
     for (let x = -8; x <= 6; x += 2) px(ctx, X(x), Y(by(17.6, x)), light);
   } else if (kind === 'griffin') {
-    // Орлиная голова с клювом, перья на шее, сложенное крыло на боку.
+    // Крыло сложено, но плечо приподнято над спиной, маховые — зубцами:
+    // силуэт грифона читается в любой позе, даже когда он щиплет траву.
+    poly(ctx, [[X(6), Y(by(16, 6))], [X(1), Y(by(22, 1))], [X(-4), Y(by(20.5, -4))], [X(-13), Y(by(15, -13))], [X(-11), Y(by(12, -11))], [X(-4), Y(by(11.5, -4))]], shade(body, 0.82));
+    line(ctx, X(5), Y(by(16.6, 5)), X(1), Y(by(21.6, 1)), shade(body, 1.18));
+    line(ctx, X(1), Y(by(21.6, 1)), X(-4), Y(by(20.2, -4)), shade(body, 1.1));
+    for (let i = 0; i < 5; i++) line(ctx, X(-2 - i * 2.2), Y(by(19.6 - i * 1.1, -2 - i * 2)), X(-4.5 - i * 2.2), Y(by(12.2, -5 - i * 2)), shade(body, 0.6));
+    // Шея в перьях, зубчатый воротник на груди.
     limb(ctx, X(neckBase[0]), Y(neckBase[1]), X(headTop[0]), Y(headTop[1] - 1), 5 * S, 3.6 * S, m.mane);
+    for (let i = 0; i < 4; i++) px(ctx, X(neckBase[0] - 1.5 + i), Y(neckBase[1] - 2.6 - (i % 2)), m.mane);
+    // Орлиная голова: хохолок, тёмная «бровь», крючковатый клюв.
     ellipse(ctx, X(headTop[0] + 1), Y(headTop[1] - 1.5), 2.8, 2.6, m.mane);
-    poly(ctx, [[X(headTop[0] + 3), Y(headTop[1] - 1)], [X(headTop[0] + 6.5), Y(headTop[1] - 2.5)], [X(headTop[0] + 5), Y(headTop[1] - 4)], [X(headTop[0] + 3), Y(headTop[1] - 3)]], '#e0b030');
+    px(ctx, X(headTop[0] - 1.6), Y(headTop[1] + 0.4), m.mane);
+    px(ctx, X(headTop[0] - 2.5), Y(headTop[1] + 1), shade(m.mane, 0.78));
+    const bx = headTop[0] + 3;
+    const bY = headTop[1] - 1;
+    poly(ctx, [[X(bx), Y(bY)], [X(bx + 3.4), Y(bY - 0.4)], [X(bx + 4.2), Y(bY - 2)], [X(bx + 3.2), Y(bY - 3)], [X(bx), Y(bY - 2.4)]], '#e0b030');
+    px(ctx, X(bx + 3.8), Y(bY - 2.6), '#8a5a10');
+    line(ctx, X(bx), Y(bY - 1.2), X(bx + 2.6), Y(bY - 1.4), '#b08420');
     px(ctx, X(headTop[0] + 2), Y(headTop[1] - 0.6), '#140c0a');
-    px(ctx, X(headTop[0] - 1), Y(headTop[1] + 1.5), m.mane);
-    poly(ctx, [[X(6), Y(by(16, 6))], [X(-8), Y(by(18.5, -8))], [X(-12), Y(by(13, -12))], [X(-4), Y(by(11.5, -4))]], shade(body, 0.85));
-    for (let i = 0; i < 4; i++) line(ctx, X(-4 - i * 2), Y(by(17.5 - i * 0.4, -4)), X(-6 - i * 2), Y(by(12.5, -6)), shade(body, 0.65));
+    line(ctx, X(headTop[0] + 0.8), Y(headTop[1] + 0.5), X(headTop[0] + 2.8), Y(headTop[1] - 0.1), shade(m.mane, 0.5));
   } else {
     limb(ctx, X(neckBase[0]), Y(neckBase[1]), X(headTop[0]), Y(headTop[1] - 1), 5.2 * S, 3.2 * S, body);
     // Грива вдоль шеи.
