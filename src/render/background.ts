@@ -272,6 +272,7 @@ export class Background {
   private meteors: Meteor[] = [];
   private aurora: [HTMLCanvasElement, CanvasRenderingContext2D] | null = null;
   private auroraT = 0;
+  private auroraStrip: HTMLCanvasElement | null = null;
   private lastTime = 0;
 
   constructor(seed: number, season: Season) {
@@ -580,32 +581,41 @@ export class Background {
     }
   }
 
-  /** Северное сияние: занавесы света, рисуются в половинном разрешении. */
+  /** Северное сияние: занавесы света в половинном разрешении — столбцы из готовой градиентной полоски. */
   private drawAurora(ctx: CanvasRenderingContext2D, a: Atmosphere, w: number, horizonY: number, time: number, camX: number): void {
     const hw = Math.ceil(w / 2);
     const hh = Math.ceil(horizonY / 2);
     if (!this.aurora || this.aurora[0].width !== hw || this.aurora[0].height !== hh) this.aurora = makeCanvas(hw, hh);
+    if (!this.auroraStrip) {
+      const [c, sctx] = makeCanvas(1, 40);
+      const g = sctx.createLinearGradient(0, 0, 0, 40);
+      g.addColorStop(0, 'rgba(170,110,230,0)');
+      g.addColorStop(0.1, 'rgba(170,110,230,0.8)');
+      g.addColorStop(0.28, 'rgba(90,255,160,0.9)');
+      g.addColorStop(0.7, 'rgba(70,220,150,0.35)');
+      g.addColorStop(1, 'rgba(60,200,140,0)');
+      sctx.fillStyle = g;
+      sctx.fillRect(0, 0, 1, 40);
+      this.auroraStrip = c;
+    }
     const [cv, c] = this.aurora;
-    if (time - this.auroraT > 0.1 || time < this.auroraT) {
+    if (time - this.auroraT > 0.12 || time < this.auroraT) {
       this.auroraT = time;
       c.clearRect(0, 0, hw, hh);
       const shift = camX * 0.006;
       for (let band = 0; band < 2; band++) {
         for (let x = 0; x < hw; x++) {
           const wx = x + shift * 40;
-          const top = hh * (0.18 + band * 0.14) + Math.sin(wx * 0.021 + time * 0.25 + band * 2) * 9 + Math.sin(wx * 0.057 - time * 0.4) * 4;
-          const len = 18 + 14 * Math.sin(wx * 0.013 + time * 0.2 + band) ** 2;
+          const top = hh * (0.14 + band * 0.14) + Math.sin(wx * 0.021 + time * 0.25 + band * 2) * 9 + Math.sin(wx * 0.057 - time * 0.4) * 4;
+          const len = 20 + 16 * Math.sin(wx * 0.013 + time * 0.2 + band) ** 2;
           const ray = 0.45 + 0.55 * Math.sin(wx * 0.33 + time * 1.3 + band * 3) ** 2;
-          const k = ray * (0.55 + 0.45 * Math.sin(wx * 0.009 - time * 0.15 + band * 4));
-          for (let y = 0; y < len; y += 2) {
-            const t = y / len;
-            const alpha = k * (1 - t) * (t < 0.15 ? t / 0.15 : 1) * 0.85;
-            if (alpha < 0.03) continue;
-            c.fillStyle = t < 0.25 && band === 0 ? `rgba(170,110,230,${alpha.toFixed(3)})` : `rgba(90,255,160,${alpha.toFixed(3)})`;
-            c.fillRect(x, Math.round(top + y), 1, 2);
-          }
+          const k = ray * (0.55 + 0.45 * Math.sin(wx * 0.009 - time * 0.15 + band * 4)) * (band ? 0.7 : 1);
+          if (k < 0.05) continue;
+          c.globalAlpha = Math.min(1, k);
+          c.drawImage(this.auroraStrip, x, Math.round(top), 1, Math.round(len));
         }
       }
+      c.globalAlpha = 1;
     }
     ctx.globalAlpha = Math.min(1, a.aurora);
     ctx.globalCompositeOperation = 'lighter';
