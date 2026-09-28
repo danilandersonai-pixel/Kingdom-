@@ -46,7 +46,9 @@ export type SoundName =
   | 'lute'
   | 'cluck'
   | 'thunder'
-  | 'fanfare';
+  | 'fanfare'
+  | 'gull'
+  | 'waves';
 
 export interface Sfx {
   /** pan: -1..1 — стерео по положению на экране; vol: 0..1. */

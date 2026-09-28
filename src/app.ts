@@ -8,6 +8,7 @@ import { Loop } from './engine/loop';
 import { Audio } from './engine/audio';
 import { Renderer } from './render/renderer';
 import { Ambience } from './render/ambience';
+import { Voyage, VOYAGE_TIME } from './render/voyage';
 import { computeAtmosphere, nightFactor } from './render/atmosphere';
 import type { Light } from './render/lighting';
 import type { World } from './game/world';
@@ -31,6 +32,9 @@ import { toRoman, clamp } from './engine/math';
 import { loadJson, saveJson } from './engine/storage';
 import { M, type Difficulty } from './game/config';
 import { saveCampaign, loadCampaign, hasSave, clearSave } from './game/save';
+
+/** Когда (с от отплытия) начинается сцена плавания. */
+const SAIL_VOYAGE = 2.2;
 
 export type AppState = 'title' | 'playing' | 'paused' | 'gameover' | 'choose' | 'sailing' | 'victory' | 'help';
 
@@ -57,7 +61,10 @@ export class App {
   params: URLSearchParams;
   private stateTime = 0;
   private menu!: Menu;
-  private sail: { dock: CentralDock; dest: number; t: number; monarch: Monarch } | null = null;
+  private sail: { dock: CentralDock; dest: number; from: number; t: number; monarch: Monarch } | null = null;
+  private voyage = new Voyage();
+  /** Небо покинутого острова: на нём идёт вся сцена плавания, без скачка облаков. */
+  private voyageBg: Renderer['bg'] | null = null;
   private chooseIndex = 2;
   /** Начало правления: пока монарх стоит на месте, «вниз» меняет его облик. */
   private reroll: { x: number } | null = null;
@@ -340,7 +347,7 @@ export class App {
     const c = this.campaign;
     this.chooseIndex = Math.min(5, c.current + 1);
     if (this.chooseIndex === c.current) this.chooseIndex = Math.max(1, c.current - 1);
-    this.sail = { dock, dest: this.chooseIndex, t: 0, monarch: m };
+    this.sail = { dock, dest: this.chooseIndex, from: c.current, t: 0, monarch: m };
     this.setState('choose');
   }
 
@@ -497,16 +504,30 @@ export class App {
         break;
       }
       case 'sailing': {
+        // Отплытие: мир гаснет (1.4–2.2 с), затем сцена плавания; новый
+        // остров загружается за ней (2.6 с) и проявляется в конце.
         const s = this.sail!;
         s.t += dt;
+        const vEnd = SAIL_VOYAGE + VOYAGE_TIME;
+        // Нажатие пропускает путь — сразу к прибытию.
+        if (s.t > SAIL_VOYAGE + 0.6 && s.t < vEnd - 0.6 && (p0.pressed('confirm') || this.input.taps.length)) s.t = vEnd - 0.6;
+        // Звуки моря: накаты волн и крики чаек (днём).
+        const v = s.t - SAIL_VOYAGE;
+        if (v > 0 && v < VOYAGE_TIME) {
+          const prev = v - dt;
+          if (Math.floor(v / 1.6) !== Math.floor(prev / 1.6) || prev <= 0) this.audio.play('waves', Math.sin(v) * 0.4, 0.9);
+          const day = this.atmosphere().overlayAlpha < 0.45;
+          if (day && ((prev < 0.9 && v >= 0.9) || (prev < 2.5 && v >= 2.5))) this.audio.play('gull', -0.3 + v * 0.2, 0.8);
+        }
         if (s.t < 2.6) this.stepWorld(dt, false);
         if (s.t >= 2.6 && !s.dock.dead && s.t - dt < 2.6) {
           const a = this.campaign.sail(w, this.monarchs, s.dock, s.dest);
           this.enterWorld(a.world, a.monarchs);
         }
         if (s.t > 2.6) this.stepWorld(dt, false);
-        if (s.t > 6) {
+        if (s.t > vEnd + 1) {
           this.sail = null;
+          this.voyageBg = null;
           this.setState('playing');
         }
         break;
@@ -545,7 +566,9 @@ export class App {
   private startSail(): void {
     if (!this.sail) return;
     this.sail.dest = this.chooseIndex;
+    this.sail.from = this.campaign.current;
     this.sail.t = 0;
+    this.voyageBg = this.renderer.bg;
     this.setState('sailing');
     this.world.sound('horn', this.sail.dock.x, 1);
   }
@@ -565,6 +588,7 @@ export class App {
     this.renderer.setSeason(w.time.season);
     this.updateWeather(dt);
     this.hud.update(dt, focus);
+    this.hud.yieldTo(this.plaques.active);
     // Атмосфера: лёд зимой, лучи в ясную погоду, живая природа.
     const winter = w.time.season === 'winter';
     const r = this.renderer;
@@ -793,10 +817,19 @@ export class App {
         }
         break;
       case 'sailing': {
-        const t = this.sail?.t ?? 0;
-        const a = t < 2.6 ? clamp((t - 1) / 1.6, 0, 1) : clamp(1 - (t - 4) / 1.5, 0, 1);
+        const s = this.sail;
+        const t = s?.t ?? 0;
+        const v = t - SAIL_VOYAGE;
+        let a: number;
+        if (v < 0) a = clamp((t - 1.4) / (SAIL_VOYAGE - 1.4), 0, 1);
+        else if (v < VOYAGE_TIME) {
+          const m = s?.monarch ?? this.monarchs[0];
+          const rider = m.hasCrown ? m.rider : { ...m.rider, crown: m.rider.hair, gem: m.rider.hair };
+          const key = `${m.mount.id}:${m.riderKey}:${m.hasCrown ? 1 : 0}`;
+          this.voyage.draw(ctx, this.voyageBg ?? this.renderer.bg, this.atmosphere(), v, w, h, this.renderer.horizonY, this.time, s?.from ?? 1, s?.dest ?? 1, { key, mount: m.mount.look, rider });
+          a = Math.max(clamp(1 - v / 0.6, 0, 1), clamp((v - (VOYAGE_TIME - 0.6)) / 0.6, 0, 1));
+        } else a = clamp(1 - (v - VOYAGE_TIME) / 1, 0, 1);
         this.dim(ctx, a);
-        if (a > 0.5) drawText(ctx, `ОСТРОВ ${toRoman(this.sail?.dest ?? 1)}`, cx, Math.floor(h * 0.42), { align: 'center', scale: 3, color: '#f4e4b8', alpha: (a - 0.5) * 2 });
         break;
       }
       case 'gameover': {

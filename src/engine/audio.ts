@@ -309,6 +309,18 @@ export class Audio implements Sfx {
       case 'splash':
         this.noiseBurst(0.25, 0.1 * v, 'bandpass', 1100, { pan, slide: 400 });
         break;
+      case 'gull': {
+        // «Кии-ау» дважды: тон скользит вниз, лёгкая хрипотца пилой.
+        const f = 1500 * r();
+        this.tone(f, 0.22, 'triangle', 0.05 * v, { pan, slide: f * 0.62, attack: 0.02 });
+        this.tone(f, 0.2, 'sawtooth', 0.012 * v, { pan, slide: f * 0.62, attack: 0.02 });
+        this.tone(f * 0.96, 0.18, 'triangle', 0.04 * v, { pan, slide: f * 0.64, attack: 0.02, at: now + 0.27 });
+        break;
+      }
+      case 'waves':
+        // Накат волны: мягкий шум с медленным нарастанием.
+        this.noiseBurst(1.7, 0.07 * v, 'lowpass', 900 * r(), { pan, slide: 320, attack: 0.55 });
+        break;
       case 'bark':
         this.tone(520, 0.08, 'square', 0.07 * v, { pan, slide: 380 });
         this.tone(480, 0.09, 'square', 0.06 * v, { pan, slide: 330, at: now + 0.13 });

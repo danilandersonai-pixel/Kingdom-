@@ -37,12 +37,23 @@ function pilePositions(n: number): Array<[number, number, number]> {
   return out;
 }
 
+/** Сколько секунд висит число дня. */
+const DAY_BANNER = 7;
+
 export class Hud {
   private purseAlpha = 0;
   dayBanner = { day: 0, t: 99 };
 
   showDay(day: number): void {
     this.dayBanner = { day, t: 0 };
+  }
+
+  /** Пока висит памятная табличка, число дня ждёт своей очереди (или гаснет). */
+  yieldTo(plaque: boolean): void {
+    if (!plaque) return;
+    const t = this.dayBanner.t;
+    if (t < 1.2) this.dayBanner.t = 0;
+    else if (t < DAY_BANNER - 1) this.dayBanner.t = DAY_BANNER - 1;
   }
 
   update(dt: number, m: Monarch | null): void {
@@ -142,7 +153,7 @@ export class Hud {
 
   private drawDay(ctx: CanvasRenderingContext2D, r: Renderer, blood = false): void {
     const t = this.dayBanner.t;
-    const dur = 7;
+    const dur = DAY_BANNER;
     if (t > dur || this.dayBanner.day <= 0) return;
     // Римское число дня над королевством (в день Кровавой луны — красное).
     const a = t < 1.2 ? t / 1.2 : t > dur - 2 ? (dur - t) / 2 : 1;
