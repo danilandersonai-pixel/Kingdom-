@@ -2,6 +2,7 @@
 // лавки инструментов, ферма, лагерь бродяг, сундук, порталы Жадности,
 // лодка, статуи, хижина отшельника. Всё рисуется кодом по пикселям.
 
+import { masonry as masonry2 } from './town';
 import { makeCanvas, type Sprite } from '../engine/sprite';
 import { Rng } from '../engine/rng';
 import { ellipse, line, poly, px, rect, shade } from './px';
@@ -27,35 +28,10 @@ function build(key: string, w: number, h: number, paint: (ctx: CanvasRenderingCo
   return s;
 }
 
-/** Каменная кладка в прямоугольнике. */
+/** Каменная кладка в прямоугольнике (палитра из базового цвета, мох у высоких стен). */
 function masonry(ctx: CanvasRenderingContext2D, x: number, y: number, w: number, h: number, seed: number, base = STONE): void {
-  rect(ctx, x, y, w, h, base);
-  const d = shade(base, 0.68);
-  const l = shade(base, 1.22);
-  for (let row = 0; row * 4 < h; row++) {
-    const yy = y + row * 4;
-    rect(ctx, x, yy, w, 1, d);
-    const off = row % 2 === 0 ? 0 : 3;
-    for (let xx = x + off; xx < x + w; xx += 6) {
-      px(ctx, xx, yy + 1, d);
-      px(ctx, xx, yy + 2, d);
-      px(ctx, xx, yy + 3, d);
-      if (hash2(xx + seed, yy) > 0.5) px(ctx, xx + 1, yy + 1, l);
-    }
-  }
-  // Свет слева, тень справа.
-  rect(ctx, x, y, 1, h, l);
-  rect(ctx, x + w - 1, y, 1, h, d);
-}
-
-/** Бревно с заострённым верхом. */
-function stake(ctx: CanvasRenderingContext2D, x: number, bottom: number, height: number, wdt = 2): void {
-  const top = bottom - height;
-  rect(ctx, x, top + 2, wdt, height - 2, WOOD);
-  rect(ctx, x, top + 2, 1, height - 2, WOOD_L);
-  if (wdt > 2) rect(ctx, x + wdt - 1, top + 2, 1, height - 2, WOOD_D);
-  px(ctx, x + (wdt > 2 ? 1 : 0), top, WOOD_L);
-  rect(ctx, x, top + 1, wdt, 1, WOOD);
+  const pal = [shade(base, 0.55), shade(base, 0.76), base, shade(base, 1.12), shade(base, 1.3)];
+  masonry2(ctx, x, y, w, h, seed, pal, h >= 14);
 }
 
 // ——— Стены ———
@@ -76,18 +52,45 @@ export function wallSprite(level: number, dmg: number): Sprite {
         break;
       }
       case 1: {
-        const hs = [12, 14, 11, 13];
-        hs.forEach((hh, i) => stake(ctx, 1 + i * 2, h, hh - (d === 2 && i === 1 ? 5 : 0)));
-        rect(ctx, 0, h - 8, w, 1, ROPE);
-        rect(ctx, 0, h - 4, w, 1, ROPE);
+        // Заострённые колья, связанные верёвкой; крайние наклонены наружу.
+        const hs = [11, 14, 12, 13];
+        hs.forEach((hh, i) => {
+          const tall = hh - (d === 2 && i === 1 ? 6 : 0) - (d >= 1 && i === 3 ? 2 : 0);
+          const x = 1 + i * 2;
+          const lean = i === 0 ? -1 : i === 3 ? 1 : 0;
+          for (let y = 0; y < tall; y++) {
+            const xx = x + (y > tall * 0.6 ? lean : 0);
+            const top = y >= tall - 2;
+            px(ctx, xx, h - 1 - y, top ? '#c8a878' : y % 5 === 2 ? WOOD_D : WOOD_L);
+            if (!top) px(ctx, xx + 1, h - 1 - y, y % 4 === 1 ? '#3a2616' : WOOD);
+          }
+        });
+        for (const y of [h - 4, h - 8]) {
+          rect(ctx, 0, y, w, 1, ROPE);
+          for (let x = 1; x < w; x += 2) px(ctx, x, y, '#a08858');
+        }
         break;
       }
       case 2: {
-        for (let i = 0; i < 5; i++) stake(ctx, 1 + i * 2, h, 19 + r.int(0, 3) - (d === 2 && i === 2 ? 7 : 0));
-        rect(ctx, 0, h - 15, w, 2, WOOD_D);
-        rect(ctx, 0, h - 6, w, 2, WOOD_D);
-        px(ctx, 2, h - 15, IRON);
-        px(ctx, 9, h - 6, IRON);
+        // Частокол: плотные брёвна с заострёнными концами, поперечины и железные скобы.
+        for (let i = 0; i < 5; i++) {
+          const x = 1 + i * 2;
+          const tall = 19 + r.int(0, 3) - (d === 2 && i === 2 ? 8 : 0) - (d >= 1 && i === 4 ? 3 : 0);
+          rect(ctx, x, h - tall + 2, 1, tall - 2, WOOD_L);
+          rect(ctx, x + 1, h - tall + 2, 1, tall - 2, WOOD);
+          px(ctx, x, h - tall + 1, '#c8a878');
+          px(ctx, x + 1, h - tall + 1, WOOD_L);
+          px(ctx, x, h - tall, '#d8b888');
+          for (let y = h - tall + 4; y < h; y += 5) px(ctx, x + 1, y, WOOD_D);
+        }
+        for (const y of [h - 15, h - 6]) {
+          rect(ctx, 0, y, w, 2, WOOD_D);
+          rect(ctx, 0, y, w, 1, '#6a4a30');
+        }
+        for (const [x, y] of [[2, h - 15], [9, h - 6], [6, h - 15]] as Array<[number, number]>) {
+          px(ctx, x, y, '#8a929c');
+          px(ctx, x, y + 1, IRON);
+        }
         break;
       }
       case 3: {
@@ -102,11 +105,18 @@ export function wallSprite(level: number, dmg: number): Sprite {
         break;
       }
       default: {
-        masonry(ctx, 0, 6, w, h - 6, 8, '#7a7a84');
-        for (let i = 0; i < 4; i++) masonry(ctx, i * 5, 0, 3, 7, 13, '#7a7a84');
+        // Железная стена: тёмная кладка в железных листах с заклёпками и шипами поверху.
+        masonry(ctx, 0, 6, w, h - 6, 8, '#6a6a76');
+        for (let i = 0; i < 4; i++) masonry(ctx, i * 5, 1, 3, 6, 13, '#6a6a76');
+        for (let i = 0; i < 4; i++) {
+          px(ctx, i * 5 + 1, 0, '#9aa2ac');
+          px(ctx, i * 5 + 1, -1, '#c0c8d0');
+        }
         for (const yy of [10, 20, 30]) {
-          rect(ctx, 0, yy, w, 2, IRON);
-          for (let xx = 1; xx < w; xx += 4) px(ctx, xx, yy, '#8a929c');
+          rect(ctx, 0, yy, w, 3, '#3a3d45');
+          rect(ctx, 0, yy, w, 1, '#6a707a');
+          rect(ctx, 0, yy + 2, w, 1, '#24262c');
+          for (let xx = 1; xx < w; xx += 4) px(ctx, xx, yy + 1, '#aab2bc');
         }
         break;
       }
@@ -132,186 +142,115 @@ export function wallSprite(level: number, dmg: number): Sprite {
 }
 
 // ——— Башни лучников ———
-export const TOWER_PLATFORM = [0, 19, 28, 36, 44];
+/** Высота площадки лучников по уровням (0–6). */
+export const TOWER_PLATFORM = [0, 19, 28, 36, 44, 50, 50];
+
 export function towerSprite(level: number): Sprite {
-  const key = `tower:${level}`;
-  const sizes: Array<[number, number]> = [[14, 5], [16, 22], [18, 34], [18, 40], [20, 54]];
-  const [w, h] = sizes[Math.min(level, 4)];
+  const lv = Math.max(0, Math.min(6, level));
+  const key = `tower2:${lv}`;
+  const widths = [14, 16, 18, 18, 22, 24, 24];
+  const extra = [5, 6, 20, 8, 10, 34, 36];
+  const w = widths[lv];
+  const plat = TOWER_PLATFORM[lv];
+  const h = plat + extra[lv];
   return build(key, w, h, (ctx) => {
-    const top = h - TOWER_PLATFORM[level];
-    switch (level) {
+    const top = h - plat;
+    const cx = w / 2;
+    const flagPole = (x: number, y: number, len: number) => {
+      line(ctx, x, y, x, y + len, WOOD_D);
+      rect(ctx, x + 1, y, 4, 3, '#a82a2a');
+      px(ctx, x + 5, y + 1, '#a82a2a');
+      px(ctx, x + 2, y + 1, '#f2c84a');
+    };
+    switch (lv) {
       case 0:
-        ellipse(ctx, w / 2, h, 6, 3, '#5a4632');
-        rect(ctx, 6, h - 5, 2, 4, WOOD);
-        rect(ctx, 5, h - 6, 4, 1, WOOD_L);
+        // Груда камней — место под башню.
+        ellipse(ctx, cx, h, 6, 3, '#5a4632');
+        for (const [x, y, c] of [[4, h - 2, '#8a8a92'], [7, h - 3, '#9a9aa2'], [9, h - 2, '#6a6a72']] as Array<[number, number, string]>) rect(ctx, x, y, 2, 2, c);
         break;
       case 1: {
-        // Помост на сваях.
-        rect(ctx, 2, top, 2, h - top, WOOD);
-        rect(ctx, w - 4, top, 2, h - top, WOOD);
+        // Помост на сваях с укосинами и перилами.
+        for (const x of [2, w - 4]) {
+          rect(ctx, x, top, 2, h - top, WOOD);
+          rect(ctx, x, top, 1, h - top, WOOD_L);
+        }
         line(ctx, 3, top + 3, w - 4, h - 3, WOOD_D);
         line(ctx, w - 4, top + 3, 3, h - 3, WOOD_D);
         rect(ctx, 0, top, w, 2, WOOD_L);
-        rect(ctx, 0, top - 4, 1, 4, WOOD);
-        rect(ctx, w - 1, top - 4, 1, 4, WOOD);
-        rect(ctx, 0, top - 4, w, 1, WOOD_D);
+        rect(ctx, 0, top + 1, w, 1, WOOD_D);
+        for (const x of [0, w - 1]) rect(ctx, x, top - 5, 1, 5, WOOD);
+        rect(ctx, 0, top - 5, w, 1, WOOD_D);
+        rect(ctx, 0, top - 3, w, 1, WOOD);
         break;
       }
       case 2: {
-        rect(ctx, 2, top, 2, h - top, WOOD);
-        rect(ctx, w - 4, top, 2, h - top, WOOD);
+        // Дозорная вышка: высокие опоры, дощатый борт и шатровая крыша на столбах.
+        for (const x of [2, w - 4]) {
+          rect(ctx, x, top, 2, h - top, WOOD);
+          rect(ctx, x, top, 1, h - top, WOOD_L);
+        }
         for (let y = top + 4; y < h - 2; y += 8) {
           line(ctx, 3, y, w - 4, y + 7, WOOD_D);
           line(ctx, w - 4, y, 3, y + 7, WOOD_D);
         }
-        rect(ctx, 0, top, w, 2, WOOD_L);
-        for (let x = 0; x < w; x += 3) rect(ctx, x, top - 5, 2, 5, WOOD);
-        // Навес.
-        poly(ctx, [[-1, top - 12], [w + 1, top - 12], [w / 2, top - 18]], '#8a3a2a');
-        rect(ctx, 1, top - 12, 1, 7, WOOD_D);
-        rect(ctx, w - 2, top - 12, 1, 7, WOOD_D);
+        rect(ctx, 0, top - 6, w, 8, WOOD);
+        for (let x = 0; x < w; x += 3) rect(ctx, x, top - 6, 1, 8, WOOD_L);
+        rect(ctx, 0, top + 1, w, 1, WOOD_D);
+        rect(ctx, 1, top - 14, 1, 8, WOOD_D);
+        rect(ctx, w - 2, top - 14, 1, 8, WOOD_D);
+        poly(ctx, [[-1, top - 13], [w + 1, top - 13], [cx, top - 20]], '#7a3424');
+        line(ctx, -1, top - 13, cx, top - 20, '#a8543a');
+        for (let y = top - 18; y < top - 13; y += 2) line(ctx, cx - (y - top + 20) * 1.2, y, cx + (y - top + 20) * 1.2, y, '#6a2c1e');
         break;
       }
       case 3: {
+        // Каменная башня с зубцами и бойницей.
         masonry(ctx, 2, top + 2, w - 4, h - top - 2, 21);
-        masonry(ctx, 0, top - 4, w, 6, 23);
-        for (let x = 0; x < w; x += 4) masonry(ctx, x, top - 8, 3, 4, 25);
-        break;
-      }
-      default: {
-        masonry(ctx, 2, top + 2, w - 4, h - top - 2, 31);
-        masonry(ctx, 0, top - 3, w, 5, 33);
-        rect(ctx, 1, top - 10, 1, 7, WOOD_D);
-        rect(ctx, w - 2, top - 10, 1, 7, WOOD_D);
-        poly(ctx, [[-2, top - 10], [w + 2, top - 10], [w / 2, top - 20]], '#5a6a8a');
-        line(ctx, w / 2, top - 20, w / 2, top - 26, WOOD_D);
-        rect(ctx, w / 2 + 1, top - 26, 4, 3, '#a82a2a');
-        break;
-      }
-    }
-  });
-}
-
-// ——— Городской центр ———
-export const TC_SIZES: Array<[number, number]> = [[20, 8], [24, 30], [36, 36], [44, 50], [50, 60], [62, 72], [72, 84]];
-
-export function townCenterSprite(level: number, banner = '#a82a2a'): Sprite {
-  const key = `tc:${level}:${banner}`;
-  const [w, h] = TC_SIZES[Math.min(level, 6)];
-  return build(key, w, h, (ctx) => {
-    const cx = Math.floor(w / 2);
-    const flag = (x: number, y: number, len = 8) => {
-      line(ctx, x, y, x, y + len, WOOD_D);
-      rect(ctx, x + 1, y, 5, 4, banner);
-      px(ctx, x + 3, y + 1, '#f2c84a');
-      px(ctx, x + 6, y + 1, banner);
-      px(ctx, x + 6, y + 2, banner);
-    };
-    switch (level) {
-      case 0: {
-        // Заброшенное кострище.
-        for (let i = 0; i < 7; i++) {
-          const a = (i / 7) * Math.PI;
-          px(ctx, cx + Math.cos(a) * 7, h - 1 - Math.sin(a) * 1.5, '#7a7a80');
-        }
-        line(ctx, cx - 5, h - 2, cx + 4, h - 3, WOOD_D);
-        line(ctx, cx - 3, h - 4, cx + 5, h - 2, WOOD);
-        break;
-      }
-      case 1: {
-        // Лагерь: тотем со знаменем.
-        rect(ctx, cx - 1, 4, 3, h - 4, WOOD);
-        rect(ctx, cx - 1, 4, 1, h - 4, WOOD_L);
-        rect(ctx, cx - 3, 8, 7, 2, WOOD_D);
-        poly(ctx, [[cx + 2, 4], [cx + 10, 5], [cx + 9, 13], [cx + 2, 12]], banner);
-        px(ctx, cx + 6, 8, '#f2c84a');
-        px(ctx, cx + 5, 7, '#f2c84a');
-        px(ctx, cx + 7, 7, '#f2c84a');
-        px(ctx, cx, 2, '#f2c84a');
-        px(ctx, cx, 3, WOOD_D);
-        // Брёвна-скамейки.
-        rect(ctx, 1, h - 3, 7, 2, WOOD_D);
-        rect(ctx, w - 8, h - 3, 7, 2, WOOD_D);
-        break;
-      }
-      case 2: {
-        // Деревянный дом с частоколом.
-        rect(ctx, 4, h - 16, w - 8, 16, WOOD);
-        for (let x = 5; x < w - 5; x += 3) rect(ctx, x, h - 16, 1, 16, WOOD_D);
-        poly(ctx, [[1, h - 16], [w - 1, h - 16], [cx, h - 30]], '#6a4a30');
-        line(ctx, 1, h - 16, cx, h - 30, WOOD_L);
-        rect(ctx, cx - 3, h - 9, 6, 9, '#2a1a12');
-        for (let x = 0; x < w; x += 3) stake(ctx, x, h, 7);
-        flag(cx, 0, 6);
-        break;
-      }
-      case 3: {
-        // Деревянная крепость с вышкой.
-        rect(ctx, 6, h - 24, w - 12, 24, WOOD);
-        for (let x = 7; x < w - 6; x += 3) rect(ctx, x, h - 24, 1, 24, WOOD_D);
-        rect(ctx, cx - 6, h - 40, 12, 16, WOOD_L);
-        for (let x = cx - 5; x < cx + 6; x += 3) rect(ctx, x, h - 40, 1, 16, WOOD);
-        poly(ctx, [[cx - 8, h - 40], [cx + 8, h - 40], [cx, h - 48]], '#6a3a2a');
-        poly(ctx, [[3, h - 24], [w - 3, h - 24], [w - 8, h - 30], [8, h - 30]], '#6a4a30');
-        rect(ctx, cx - 3, h - 10, 6, 10, '#2a1a12');
-        rect(ctx, cx - 3, h - 34, 2, 3, '#e8c060');
-        rect(ctx, cx + 1, h - 34, 2, 3, '#e8c060');
-        for (let x = 0; x < w; x += 3) stake(ctx, x, h, 9);
-        flag(cx, 0, 4);
-        flag(4, h - 36, 12);
-        flag(w - 8, h - 36, 12);
+        masonry(ctx, 0, top - 2, w, 5, 23);
+        for (let x = 0; x < w; x += 5) masonry(ctx, x, top - 7, 3, 5, 25);
+        rect(ctx, cx - 1, top + 10, 1, 4, '#1a1418');
         break;
       }
       case 4: {
-        // Каменная цитадель.
-        masonry(ctx, 6, h - 34, w - 12, 34, 41);
-        masonry(ctx, cx - 8, h - 50, 16, 18, 43);
-        for (let x = cx - 8; x < cx + 8; x += 4) masonry(ctx, x, h - 54, 3, 4, 45);
-        for (let x = 6; x < w - 6; x += 4) masonry(ctx, x, h - 37, 3, 4, 47);
-        rect(ctx, cx - 4, h - 14, 8, 14, '#2a1a12');
-        rect(ctx, cx - 4, h - 15, 8, 1, WOOD_L);
-        rect(ctx, cx - 1, h - 44, 2, 4, '#e8c060');
-        rect(ctx, 10, h - 26, 2, 3, '#e8c060');
-        rect(ctx, w - 12, h - 26, 2, 3, '#e8c060');
-        flag(cx, 0, 6);
-        break;
-      }
-      case 5: {
-        // Замок с двумя башнями.
-        masonry(ctx, 10, h - 36, w - 20, 36, 51);
-        masonry(ctx, 1, h - 52, 12, 52, 53);
-        masonry(ctx, w - 13, h - 52, 12, 52, 55);
-        for (let x = 1; x < 13; x += 4) masonry(ctx, x, h - 56, 3, 4, 57);
-        for (let x = w - 13; x < w - 1; x += 4) masonry(ctx, x, h - 56, 3, 4, 59);
-        masonry(ctx, cx - 9, h - 58, 18, 24, 61);
-        poly(ctx, [[cx - 11, h - 58], [cx + 11, h - 58], [cx, h - 70]], '#4a5a8a');
-        for (let x = 10; x < w - 10; x += 4) masonry(ctx, x, h - 39, 3, 4, 63);
-        rect(ctx, cx - 5, h - 16, 10, 16, '#2a1a12');
-        for (let y = h - 15; y < h; y += 3) rect(ctx, cx - 5, y, 10, 1, IRON);
-        rect(ctx, 6, h - 40, 2, 4, '#e8c060');
-        rect(ctx, w - 8, h - 40, 2, 4, '#e8c060');
-        rect(ctx, cx - 1, h - 50, 2, 4, '#e8c060');
-        flag(cx, 0, 6);
-        flag(6, h - 66, 10);
-        flag(w - 7, h - 66, 10);
+        // Замковая башня: навесные бойницы (машикули), зубцы, знамя.
+        masonry(ctx, 3, top + 4, w - 6, h - top - 4, 31);
+        masonry(ctx, 0, top - 2, w, 6, 33);
+        for (let x = 1; x < w - 1; x += 3) px(ctx, x, top + 4, '#2a2a30');
+        for (let x = 0; x < w; x += 5) masonry(ctx, x, top - 8, 3, 6, 35);
+        rect(ctx, cx - 1, top + 12, 1, 4, '#1a1418');
+        rect(ctx, cx - 1, top + 26, 1, 4, '#1a1418');
+        rect(ctx, 5, top + 8, 3, 9, '#a82a2a');
+        px(ctx, 6, top + 11, '#f2c84a');
         break;
       }
       default: {
-        // Великий замок.
-        masonry(ctx, 12, h - 40, w - 24, 40, 71, '#9a9aa4');
-        masonry(ctx, 1, h - 60, 14, 60, 73, '#9a9aa4');
-        masonry(ctx, w - 15, h - 60, 14, 60, 75, '#9a9aa4');
-        masonry(ctx, cx - 11, h - 68, 22, 30, 77, '#9a9aa4');
-        poly(ctx, [[-1, h - 60], [17, h - 60], [8, h - 72]], '#3a4a7a');
-        poly(ctx, [[w - 17, h - 60], [w + 1, h - 60], [w - 8, h - 72]], '#3a4a7a');
-        poly(ctx, [[cx - 13, h - 68], [cx + 13, h - 68], [cx, h - 82]], '#3a4a7a');
-        for (let x = 12; x < w - 12; x += 4) masonry(ctx, x, h - 44, 3, 4, 79, '#9a9aa4');
-        rect(ctx, cx - 6, h - 18, 12, 18, '#2a1a12');
-        for (let y = h - 17; y < h; y += 3) rect(ctx, cx - 6, y, 12, 1, IRON);
-        for (const [x, y] of [[6, h - 46], [w - 8, h - 46], [cx - 1, h - 56], [cx - 5, h - 30], [cx + 3, h - 30]] as Array<[number, number]>) rect(ctx, x, y, 2, 4, '#e8c060');
-        flag(cx, 0, 4);
-        flag(7, h - 78, 8);
-        flag(w - 8, h - 78, 8);
+        // Укреплённая (5) и железная (6) башни: крыша над площадкой защищает от летунов.
+        const iron = lv === 6;
+        const base = iron ? '#5e5e6a' : '#8a8a90';
+        masonry(ctx, 3, top + 4, w - 6, h - top - 4, iron ? 43 : 41, base);
+        masonry(ctx, 0, top - 2, w, 6, 45, base);
+        for (const y of iron ? [top + 12, top + 28, top + 42] : [top + 20]) {
+          rect(ctx, 3, y, w - 6, 2, '#3a3d45');
+          rect(ctx, 3, y, w - 6, 1, '#6a707a');
+          for (let x = 4; x < w - 3; x += 4) px(ctx, x, y + 1, '#aab2bc');
+        }
+        // Столбы и крыша.
+        rect(ctx, 1, top - 14, 2, 12, WOOD_D);
+        rect(ctx, w - 3, top - 14, 2, 12, WOOD_D);
+        const roofTop = top - 26;
+        for (let y = roofTop; y < top - 12; y++) {
+          const t = (y - roofTop) / (top - 12 - roofTop);
+          const half = (w / 2 + 2) * t;
+          for (let x = Math.round(cx - half); x <= Math.round(cx + half); x++) {
+            const left = x < cx;
+            const row = (y - roofTop) % 3 === 0;
+            const colr = iron ? (left ? (row ? '#3e4450' : '#56606e') : row ? '#2a2e36' : '#3e4450') : left ? (row ? '#34405e' : '#4a5a86') : row ? '#262e46' : '#34405e';
+            px(ctx, x, y, colr);
+          }
+        }
+        if (iron) for (let x = 1; x < w; x += 4) px(ctx, x, top - 12, '#c0c8d0');
+        flagPole(Math.round(cx), roofTop - 7, 7);
+        rect(ctx, cx - 1, top + 14, 1, 4, '#1a1418');
         break;
       }
     }

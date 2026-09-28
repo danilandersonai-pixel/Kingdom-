@@ -220,7 +220,7 @@ export class Tower extends Structure {
   }
 
   get platform(): number {
-    return TOWER_PLATFORM[Math.min(this.level, 4)] + (this.level >= 5 ? 6 : 0);
+    return TOWER_PLATFORM[Math.min(this.level, 6)];
   }
 
   get rangeBonus(): number {
@@ -263,9 +263,9 @@ export class Tower extends Structure {
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     const sx = r.sx(this.x);
     const gy = r.sy(0);
-    blit(ctx, towerSprite(Math.min(this.level, 4)), sx, gy);
+    blit(ctx, towerSprite(this.level), sx, gy);
     if (this.scaffold) {
-      const h = TOWER_PLATFORM[Math.min(this.targetLevel, 4)] + 6;
+      const h = TOWER_PLATFORM[Math.min(this.targetLevel, 6)] + 6;
       blit(ctx, scaffoldSprite(20, h), sx, gy, false, 0.9);
     }
   }

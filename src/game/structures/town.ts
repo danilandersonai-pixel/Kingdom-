@@ -7,7 +7,9 @@ import type { Monarch } from '../entities/monarch';
 import type { Renderer } from '../../render/renderer';
 import type { Light } from '../../render/lighting';
 import { blit, hex } from '../../engine/sprite';
-import { townCenterSprite, shopSprite, scaffoldSprite, TC_SIZES, type ShopKind } from '../../art/buildings';
+import { shopSprite, scaffoldSprite, type ShopKind } from '../../art/buildings';
+import { townCenterSprite, tcDetails, tcFrame, TC_SIZES } from '../../art/town';
+import { nightFactor } from '../../render/atmosphere';
 import { rackItemSprite, type RackItem } from '../../art/items';
 import { TC_TIERS, TIME, PRICES, M } from '../config';
 import { fxRng } from '../../engine/rng';
@@ -36,7 +38,7 @@ export class TownCenter extends Structure {
   }
 
   override slotY(): number {
-    const [, h] = TC_SIZES[Math.min(this.level, 6)];
+    const [, h] = TC_SIZES[Math.min(this.level, 7)];
     return Math.max(24, h + 8);
   }
 
@@ -80,35 +82,90 @@ export class TownCenter extends Structure {
         p.spawn({ x: this.x + fxRng.range(-2, 2), y: 10, vx: fxRng.range(-3, 3) - 2, vy: 10, life: 2.5, max: 2.5, color: 'rgba(120,110,100,0.5)', size: 2, drag: 0.3, wobble: 6 });
       }
       if (fxRng.chance(dt * 0.5)) this.world.sound('fire', this.x, 0.25);
+      // Дым из труб.
+      const lvl = Math.min(this.level, 7);
+      if (lvl >= 2 && fxRng.chance(dt * 2.2)) {
+        const s = tcFrame(lvl);
+        for (const [x, y] of tcDetails(lvl).chimneys) {
+          p.spawn({ x: this.x - s.ax + x + fxRng.range(-1, 1), y: s.h - y, vx: fxRng.range(-2, 2) + 3, vy: fxRng.range(6, 10), life: 3.5, max: 3.5, color: 'rgba(170,165,160,0.45)', size: 2, drag: 0.2, wobble: 5 });
+        }
+      }
     }
   }
 
   lights(out: Light[]): void {
     if (this.lit) out.push({ x: this.x, y: 6, radius: 96 + this.level * 6, color: hex('#ffa850'), intensity: 1, flicker: 1 });
+    // Факелы у ворот.
+    const lvl = Math.min(this.level, 7);
+    if (lvl >= 4) {
+      const s = tcFrame(lvl);
+      for (const [x, y] of tcDetails(lvl).torches) out.push({ x: this.x - s.ax + x, y: s.h - y, radius: 34, color: hex('#ffb060'), intensity: 0.7, flicker: 1 });
+    }
   }
 
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     const sx = r.sx(this.x);
     const gy = r.sy(0);
-    const lvl = Math.min(this.level, 6);
-    if (lvl > 0) blit(ctx, townCenterSprite(lvl, this.banner), sx, gy);
+    const lvl = Math.min(this.level, 7);
+    if (lvl > 0) {
+      const s = townCenterSprite(lvl, this.banner);
+      blit(ctx, s, sx, gy);
+      // Флаги на ветру.
+      const t = this.world.clock;
+      for (const [fx0, fy0] of tcDetails(lvl).flags) {
+        const x0 = sx - s.ax + fx0 + 1;
+        const y0 = gy - s.h + fy0;
+        for (let i = 0; i < 7; i++) {
+          const wave = Math.round(Math.sin(t * 5 - i * 0.9) * (i / 7) * 1.6);
+          const len = i < 6 ? 4 : 3;
+          ctx.fillStyle = i === 0 ? '#6a1616' : this.banner;
+          ctx.fillRect(x0 + i, y0 + wave, 1, len);
+          if (i === 3) {
+            ctx.fillStyle = '#f2c84a';
+            ctx.fillRect(x0 + i, y0 + wave + 1, 1, 1);
+          }
+        }
+      }
+    }
     if (this.scaffold) {
-      const [w, h] = TC_SIZES[Math.min(this.targetLevel, 6)];
+      const [w, h] = TC_SIZES[Math.min(this.targetLevel, 7)];
       blit(ctx, scaffoldSprite(w + 4, h + 2), sx, gy, false, 0.85);
     }
     // Кострище перед городским центром.
     blit(ctx, townCenterSprite(0), sx, gy);
-    if (this.level >= 7) {
-      // Железная крепость — отличие от замка: железные полосы.
-      ctx.fillStyle = '#4a4e56';
-      ctx.fillRect(sx - 30, gy - 30, 60, 2);
-    }
   }
 
   drawEmissive(ctx: CanvasRenderingContext2D, r: Renderer): void {
     if (!this.lit) return;
     const sx = r.sx(this.x);
     const gy = r.sy(0);
+    // Ночью светятся окна и горят факелы.
+    const lvl = Math.min(this.level, 7);
+    const night = nightFactor(this.world.time.phase);
+    if (lvl >= 2 && night > 0.05) {
+      const s = townCenterSprite(lvl, this.banner);
+      const d = tcDetails(lvl);
+      const ox = sx - s.ax;
+      const oy = gy - s.h;
+      d.windows.forEach(([x, y, w, h], i) => {
+        const flick = 0.8 + 0.2 * Math.sin(this.fireT * 3 + i * 1.7);
+        ctx.globalAlpha = Math.min(1, night * 1.2) * flick;
+        ctx.fillStyle = '#ffc860';
+        ctx.fillRect(ox + x, oy + y, w, h);
+        ctx.fillStyle = '#fff0b0';
+        ctx.fillRect(ox + x, oy + y + h - 1, w, 1);
+      });
+      ctx.globalAlpha = 1;
+      for (const [x, y] of d.torches) {
+        const f = Math.sin(this.fireT * 17 + x) > 0 ? 1 : 0;
+        ctx.fillStyle = '#5a3a22';
+        ctx.fillRect(ox + x, oy + y, 1, 3);
+        ctx.fillStyle = '#ff8a3a';
+        ctx.fillRect(ox + x - 1 + f, oy + y - 3, 2, 3);
+        ctx.fillStyle = '#ffe080';
+        ctx.fillRect(ox + x, oy + y - 2, 1, 1);
+      }
+    }
     const t = this.fireT;
     const h1 = 5 + Math.round(Math.sin(t * 13) * 1.5 + Math.sin(t * 7.7) * 1);
     ctx.fillStyle = '#ff7a2a';

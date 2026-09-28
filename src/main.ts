@@ -7,7 +7,7 @@ const canvas = document.getElementById('game') as HTMLCanvasElement;
 import { MOUNTS } from './game/mounts';
 import { mountFrames } from './art/horse';
 import { Screen } from './engine/screen';
-import { treeGallery } from './debug/gallery';
+import { treeGallery, townGallery, defenseGallery } from './debug/gallery';
 const qs = new URLSearchParams(location.search);
 if (qs.get('scene') === 'mounts') {
   const scr = new Screen(canvas);
@@ -25,6 +25,18 @@ if (qs.get('scene') === 'mounts') {
   }
   (window as unknown as { __ready: boolean }).__ready = true;
   throw new Error('mount view');
+}
+if (qs.get('scene') === 'defense') {
+  canvas.style.display = 'none';
+  defenseGallery(Number(qs.get('scale') ?? 4));
+  (window as unknown as { __ready: boolean }).__ready = true;
+  throw new Error('tree view');
+}
+if (qs.get('scene') === 'town') {
+  canvas.style.display = 'none';
+  townGallery(Number(qs.get('scale') ?? 3));
+  (window as unknown as { __ready: boolean }).__ready = true;
+  throw new Error('tree view');
 }
 if (qs.get('scene') === 'trees') {
   canvas.style.display = 'none';
