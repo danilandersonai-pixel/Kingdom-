@@ -6,51 +6,15 @@ import type { Monarch } from '../entities/monarch';
 import type { Renderer } from '../../render/renderer';
 import type { Light } from '../../render/lighting';
 import { blit, hex, makeCanvas, type Sprite } from '../../engine/sprite';
-import { makeTree, masksToColor, makeBush, type TreeKind } from '../../render/treegen';
-import { Rng, fxRng } from '../../engine/rng';
+import type { TreeKind } from '../../render/treegen';
+import { treeSprite, bushSprite } from '../../art/flora';
+import { fxRng } from '../../engine/rng';
 import { campSprite, chestSprite, stumpSprite, rockSprite, beachSprite } from '../../art/buildings';
 import { rgb, mix, hex as hexColor } from '../../engine/sprite';
 import { PRICES, WORK, M, PEOPLE } from '../config';
 import { Coin } from '../entities/pickups';
 import type { Season } from '../../render/atmosphere';
 import { ellipse, px } from '../../art/px';
-
-// ——— Палитры деревьев по сезонам ———
-const TREE_COLORS: Record<Season, { leaf: string; leafShade: string; leafLight: string }> = {
-  spring: { leaf: '#3f7038', leafShade: '#2a4e2a', leafLight: '#6a9e48' },
-  summer: { leaf: '#3a6230', leafShade: '#274424', leafLight: '#5e8a3e' },
-  autumn: { leaf: '#b0602a', leafShade: '#7a3a1c', leafLight: '#e0a040' },
-  winter: { leaf: '#3a5a48', leafShade: '#28402f', leafLight: '#e8eef4' },
-};
-
-const treeSpriteCache = new Map<string, Sprite>();
-
-function treeSprite(kind: TreeKind, variant: number, height: number, season: Season): Sprite {
-  const key = `${kind}:${variant}:${height}:${season}`;
-  let s = treeSpriteCache.get(key);
-  if (s) return s;
-  const rng = new Rng(variant * 7919 + height * 31 + kind.length);
-  const winter = season === 'winter';
-  const m = makeTree(kind, rng, height, winter, winter && kind !== 'pine');
-  const c = TREE_COLORS[season];
-  const pineWinter = kind === 'pine' && winter;
-  const img = masksToColor(
-    m,
-    {
-      trunk: '#4a3526',
-      trunkShade: '#2e2018',
-      trunkLight: '#6a5038',
-      leaf: pineWinter ? '#2f5040' : kind === 'pine' ? '#2e5433' : c.leaf,
-      leafShade: pineWinter ? '#223a2e' : kind === 'pine' ? '#1f3a24' : c.leafShade,
-      leafLight: pineWinter ? '#e8eef4' : kind === 'pine' ? '#4e7a45' : c.leafLight,
-      snow: '#f0f4f8',
-    },
-    kind === 'birch',
-  );
-  s = { img, w: m.w, h: m.h, ax: m.ax, ay: m.h };
-  treeSpriteCache.set(key, s);
-  return s;
-}
 
 export class Tree extends Structure {
   readonly type = 'tree' as const;
@@ -322,7 +286,6 @@ export class BerryBush extends Structure {
   berries = true;
   ordered = false;
   regrow = 0;
-  private sprite: Sprite | null = null;
 
   constructor(x: number) {
     super();
@@ -377,14 +340,10 @@ export class BerryBush extends Structure {
   }
 
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
-    if (!this.sprite) {
-      const m = makeBush(new Rng(Math.floor(this.x)), 14, 8, false);
-      const img = masksToColor(m, { trunk: '#4a3526', trunkShade: '#2e2018', trunkLight: '#6a5038', leaf: '#3a5a36', leafShade: '#28402a', leafLight: '#5a7a4a', snow: '#f0f4f8' });
-      this.sprite = { img, w: m.w, h: m.h, ax: m.ax, ay: m.h };
-    }
+    const sprite = bushSprite(Math.floor(this.x), 14, 8, this.season === 'winter' ? 'winter' : 'summer');
     const sx = r.sx(this.x);
     const gy = r.sy(0);
-    blit(ctx, this.sprite, sx, gy);
+    blit(ctx, sprite, sx, gy);
     if (this.ripe) {
       for (let i = 0; i < 6; i++) px(ctx, sx - 6 + ((i * 5) % 13), gy - 3 - ((i * 3) % 6), '#c02a4a');
     }

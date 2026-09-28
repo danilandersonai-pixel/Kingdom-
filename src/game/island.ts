@@ -163,7 +163,7 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
   for (const x of campXs) occupy(x, 4 * M);
 
   // Деревья.
-  const kinds: TreeKind[] = ['pine', 'pine', 'oak', 'oak', 'birch'];
+  const kinds: TreeKind[] = ['pine', 'pine', 'tallpine', 'oak', 'oak', 'maple', 'birch'];
   for (const side of [-1, 1] as const) {
     let d = 24 * M + rng.range(0, 2 * M);
     const end = L - 10 * M;
@@ -173,7 +173,7 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
       const nearPortal = Math.abs(x - cliffPortal.x) < 16 * M || Math.abs(x - dockPortal.x) < 4 * M;
       if (!inClearing(x) && !nearCamp && !nearPortal && !wallSpots.some((ws) => Math.abs(ws - x) < 1.2 * M) && !towerSpots.some((t) => Math.abs(t - x) < 1.2 * M)) {
         const kind = rng.pick(kinds);
-        const h = kind === 'pine' ? rng.int(70, 120) : kind === 'birch' ? rng.int(60, 90) : rng.int(60, 100);
+        const h = kind === 'pine' ? rng.int(84, 138) : kind === 'tallpine' ? rng.int(118, 160) : kind === 'birch' ? rng.int(74, 106) : kind === 'maple' ? rng.int(64, 94) : rng.int(70, 108);
         w.addNow(new Tree(x, kind, rng.int(0, 11), h));
       }
       d += rng.range(2.2, 4) * M;

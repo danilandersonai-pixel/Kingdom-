@@ -31,9 +31,9 @@ interface LayerDef {
 const LAYERS: LayerDef[] = [
   { parallax: 0.05, lift: 30, cell: 200, perCell: [0, 0], kinds: [], heights: [0, 0], variants: 0, ridge: { base: 10, amp: 46, scale: 180, snowCaps: true } },
   { parallax: 0.14, lift: 22, cell: 60, perCell: [4, 7], kinds: [['pine', 3], ['oak', 1]], heights: [12, 26], variants: 14, ridge: { base: 8, amp: 26, scale: 160 } },
-  { parallax: 0.28, lift: 15, cell: 90, perCell: [4, 7], kinds: [['pine', 3], ['oak', 2], ['birch', 1]], heights: [30, 60], variants: 16, ridge: { base: 3, amp: 8, scale: 120 } },
-  { parallax: 0.46, lift: 8, cell: 120, perCell: [2, 5], kinds: [['pine', 3], ['oak', 3], ['birch', 1]], heights: [48, 92], variants: 18 },
-  { parallax: 0.66, lift: 3, cell: 210, perCell: [1, 2], kinds: [['pine', 2], ['oak', 3], ['birch', 1]], heights: [64, 112], variants: 16 },
+  { parallax: 0.28, lift: 15, cell: 90, perCell: [4, 7], kinds: [['pine', 3], ['oak', 2], ['birch', 1], ['tallpine', 1]], heights: [30, 60], variants: 16, ridge: { base: 3, amp: 8, scale: 120 } },
+  { parallax: 0.46, lift: 8, cell: 120, perCell: [2, 5], kinds: [['pine', 3], ['oak', 3], ['birch', 1], ['maple', 1], ['tallpine', 1]], heights: [48, 92], variants: 18 },
+  { parallax: 0.66, lift: 3, cell: 210, perCell: [1, 2], kinds: [['pine', 2], ['oak', 3], ['birch', 1], ['maple', 1], ['tallpine', 1]], heights: [64, 116], variants: 16 },
 ];
 
 const RIDGE_PERIOD = 1024;
@@ -78,7 +78,8 @@ class Layer {
         }
       }
       const h = Math.round(rng.range(def.heights[0], def.heights[1]));
-      const m = kind === 'bush' ? makeBush(rng, h * 2, h, snow) : makeTree(kind, rng, h, snow, leafless && kind !== 'pine');
+      const detail = [0, 0.15, 0.3, 0.5, 0.7][this.index] ?? 0.5;
+      const m = kind === 'bush' ? makeBush(rng, h * 2, h, snow) : makeTree(kind, rng, h, snow, leafless && kind !== 'pine' && kind !== 'tallpine', detail);
       trees.push(masksToCanvases(m));
       metas.push({ w: m.w, h: m.h, ax: m.ax });
     }
@@ -415,14 +416,15 @@ export class Background {
 
     // Солнце.
     if (a.sunH > -0.05) {
-      const sx = Math.round(w * 0.7);
+      // Солнце слева-сверху: так же освещены деревья, горы и постройки.
+      const sx = Math.round(w * 0.27);
       const sy = Math.round(horizonY - 8 - a.sunH * (horizonY - 34));
       this.glow(ctx, sx, sy, 46, a.sunColor, 0.35);
       this.disc(ctx, sx, sy, 7, rgb(a.sunColor));
     }
     // Луна.
     if (a.moonH > -0.05) {
-      const mx = Math.round(w * 0.3);
+      const mx = Math.round(w * 0.72);
       const my = Math.round(horizonY - 8 - a.moonH * (horizonY - 40));
       const r = a.bloodMoon ? 13 : 9;
       this.glow(ctx, mx, my, a.bloodMoon ? 70 : 40, a.moonColor, a.bloodMoon ? 0.4 : 0.18);

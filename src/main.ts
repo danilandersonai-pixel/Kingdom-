@@ -7,6 +7,7 @@ const canvas = document.getElementById('game') as HTMLCanvasElement;
 import { MOUNTS } from './game/mounts';
 import { mountFrames } from './art/horse';
 import { Screen } from './engine/screen';
+import { treeGallery } from './debug/gallery';
 const qs = new URLSearchParams(location.search);
 if (qs.get('scene') === 'mounts') {
   const scr = new Screen(canvas);
@@ -24,6 +25,12 @@ if (qs.get('scene') === 'mounts') {
   }
   (window as unknown as { __ready: boolean }).__ready = true;
   throw new Error('mount view');
+}
+if (qs.get('scene') === 'trees') {
+  canvas.style.display = 'none';
+  treeGallery((qs.get('season') ?? 'summer') as 'summer', Number(qs.get('scale') ?? 2));
+  (window as unknown as { __ready: boolean }).__ready = true;
+  throw new Error('tree view');
 }
 const app = new App(canvas);
 app.start();
