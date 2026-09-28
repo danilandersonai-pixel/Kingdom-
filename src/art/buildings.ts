@@ -378,15 +378,38 @@ export function dockSprite(): Sprite {
   });
 }
 
-/** Песчаный пляж на краю острова. */
+/** Песчаный пляж на краю острова: сухой песок, мокрая полоса, ракушки, топляк, дюнная трава. */
 export function beachSprite(side: -1 | 1): Sprite {
-  return build(`beach:${side}`, 90, 14, (ctx, w, h) => {
+  return build(`beach2:${side}`, 110, 18, (ctx, w, h) => {
     for (let x = 0; x < w; x++) {
+      // t: 0 — у суши, 1 — у воды.
       const t = side > 0 ? x / w : 1 - x / w;
-      const top = Math.round(3 + t * 9);
-      rect(ctx, x, top, 1, h - top, (x * 13) % 7 === 0 ? '#c8b088' : '#d8c098');
-      if (t > 0.85) rect(ctx, x, top, 1, 1, '#e8f0f0');
+      const top = Math.round(6 + Math.pow(t, 1.4) * 10);
+      for (let y = top; y < h; y++) {
+        const wet = t > 0.72;
+        const n = hash2(x, y);
+        let c = wet ? (n > 0.8 ? '#a89070' : '#9c8466') : n > 0.85 ? '#e2cca0' : n > 0.15 ? '#d6be92' : '#c8ae84';
+        if (y === top) c = wet ? '#b8a078' : '#ecdab0';
+        if (y > top + 3 && !wet) c = n > 0.5 ? '#c4a87c' : '#b89c72';
+        px(ctx, x, y, c);
+      }
+      // Дюнная трава у суши.
+      if (t < 0.3 && hash2(x, 7) > 0.55) {
+        const gh = 2 + Math.floor(hash2(x, 8) * 4);
+        for (let k = 1; k <= gh; k++) px(ctx, x + (k > gh - 2 && hash2(x, 9) > 0.5 ? side : 0), top - k, k === gh ? '#a8b060' : '#6e8a40');
+      }
+      // Ракушки и камушки.
+      if (hash2(x, 11) > 0.96 && t > 0.25 && t < 0.85) {
+        px(ctx, x, top, '#f4ece0');
+        px(ctx, x + 1, top, '#d8a0a0');
+      }
     }
+    // Топляк — выбеленное бревно.
+    const lx = side > 0 ? 38 : w - 58;
+    rect(ctx, lx, 9, 20, 2, '#b8b0a0');
+    rect(ctx, lx, 9, 20, 1, '#d8d2c4');
+    rect(ctx, lx + 20, 8, 2, 3, '#8a8274');
+    px(ctx, lx + 6, 8, '#9a9284');
   });
 }
 

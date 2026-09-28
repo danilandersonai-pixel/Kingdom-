@@ -370,10 +370,13 @@ export class Ground {
     const left = Math.floor(camX - w / 2);
     const s = this.seed;
     const gust = Math.sin(time * 0.9) * 0.6 + Math.sin(time * 2.3) * 0.25;
+    const t = this.terrain;
     for (let x = left - 8; x < left + w + 8; x++) {
       if (hash2(x, s + 71) < 0.993) continue;
+      // Камыш — только у берега острова, не в открытом море.
+      if (t && (x < t.left + 120 || x > t.left + t.cells * CELL - 120)) continue;
       const i = this.cellAt(x);
-      if (this.terrain && i >= 0 && this.terrain.blocked[i]) continue;
+      if (t && i >= 0 && t.blocked[i]) continue;
       const n = 3 + Math.floor(hash2(x, 72) * 5);
       for (let k = 0; k < n; k++) {
         const sx = x - left + (k - (n >> 1)) * 2 + (hash2(x + k, 75) > 0.5 ? 1 : 0);

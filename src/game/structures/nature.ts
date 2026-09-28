@@ -386,18 +386,40 @@ export class IslandEdge extends Structure {
     const a = r.atmos;
     const edgeX = r.sx(this.x);
     const gy = r.sy(0);
-    // Вода вместо полосы земли за краем острова.
-    const water = a ? mix(a.waterDeep, a.skyHorizon, 0.25) : hexColor('#3a6a80');
-    ctx.fillStyle = rgb(water);
-    if (this.side > 0) ctx.fillRect(edgeX, gy - 4, r.w - edgeX + 4, 20);
-    else ctx.fillRect(-4, gy - 4, edgeX + 4, 20);
-    ctx.fillStyle = rgb(mix(water, hexColor('#ffffff'), 0.35));
+    // На пляже и за краем острова травы и почвы нет — стираем их со слоя мира (виден фон).
+    const bw = 110;
+    const cx0 = this.side > 0 ? edgeX - bw * 0.7 : -4;
+    const cx1 = this.side > 0 ? r.w + 4 : edgeX + bw * 0.7;
+    ctx.clearRect(Math.round(cx0), gy - 18, Math.round(cx1 - cx0), 30);
+    // Море вместо полосы земли за краем острова: светлая гладь у поверхности, глубже темнее.
+    const surf = a ? mix(a.waterDeep, a.skyHorizon, 0.45) : hexColor('#5a8aa0');
+    const deep = a ? mix(a.waterDeep, a.skyHorizon, 0.12) : hexColor('#3a6a80');
+    const x0 = this.side > 0 ? edgeX - 6 : -4;
+    const x1 = this.side > 0 ? r.w + 4 : edgeX + 6;
+    for (let y = 0; y < 20; y++) {
+      ctx.fillStyle = rgb(mix(surf, deep, Math.min(1, y / 12)));
+      ctx.fillRect(x0, gy - 4 + y, x1 - x0, 1);
+    }
+    // Гребни волн бегут к берегу.
     const t = this.world.clock;
-    for (let i = 0; i < 8; i++) {
-      const wx = this.side > 0 ? edgeX + 10 + i * 30 + Math.sin(t + i) * 4 : edgeX - 10 - i * 30 - Math.sin(t + i) * 4;
-      ctx.fillRect(Math.round(wx), gy - 3 + (i % 3), 6, 1);
+    const crest = rgb(mix(surf, hexColor('#ffffff'), 0.45));
+    ctx.fillStyle = crest;
+    for (let i = 0; i < 14; i++) {
+      const phase = (t * 0.25 + i * 0.37) % 1;
+      const dist = 16 + i * 22 - phase * 22;
+      const wx = edgeX + this.side * dist;
+      const len = 3 + (i % 3) * 2;
+      ctx.fillRect(Math.round(this.side > 0 ? wx : wx - len), gy - 3 + (i % 4), len, 1);
     }
     const b = beachSprite(this.side);
-    ctx.drawImage(b.img, this.side > 0 ? edgeX - b.w : edgeX, gy - 4);
+    const bx = this.side > 0 ? edgeX - b.w : edgeX;
+    ctx.drawImage(b.img, bx, gy - 8);
+    // Пена накатывает на мокрый песок и отступает.
+    const reach = Math.sin(t * 0.9) * 5 + 5;
+    const foamX = this.side > 0 ? edgeX - 8 - reach : edgeX + 8 + reach;
+    ctx.fillStyle = 'rgba(240,248,250,0.8)';
+    ctx.fillRect(Math.round(foamX) - (this.side > 0 ? 0 : 10), gy + 5, 10, 1);
+    ctx.fillStyle = 'rgba(240,248,250,0.45)';
+    ctx.fillRect(Math.round(foamX) - (this.side > 0 ? 3 : 7), gy + 6, 10, 1);
   }
 }
