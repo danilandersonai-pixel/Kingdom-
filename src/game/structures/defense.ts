@@ -20,7 +20,7 @@ export class Wall extends Structure implements WallLike {
   readonly type = 'wall' as const;
   /** Уровень построен, но стена разрушена — нужна отстройка. */
   destroyed = false;
-  private rebuilding = false;
+  rebuilding = false;
   /** Стена, поставленная самим городским центром. */
   inner = false;
   private hitFlash = 0;

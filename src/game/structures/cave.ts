@@ -150,7 +150,8 @@ export class Bomb extends Structure {
 
 /** Гнездо в пещере: выпускает пачку Жадности, пока рядом бомба. */
 export class Nest extends Structure {
-  readonly type = 'portal' as const;
+  // Своё имя типа: гнёзда не выпускают ночные волны и не служат целью отрядам.
+  readonly type = 'nest' as const;
   readonly kind = 'nest';
   destroyed = false;
   private timer = 2;

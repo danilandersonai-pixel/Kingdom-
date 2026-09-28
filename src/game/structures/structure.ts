@@ -31,6 +31,7 @@ export type StructureType =
   | 'camp'
   | 'chest'
   | 'portal'
+  | 'nest'
   | 'cliffPortal'
   | 'dock'
   | 'statue'

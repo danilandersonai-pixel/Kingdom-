@@ -13,7 +13,7 @@ import type { Portal } from './structures/portal';
 import type { CentralDock, FarDock } from './structures/boat';
 import type { Wall } from './structures/defense';
 import type { Hermit } from './structures/hermits';
-import { M } from './config';
+import { M, ISLANDS } from './config';
 import { KING, QUEEN, type RiderLook } from '../art/horse';
 import { Rng } from '../engine/rng';
 import { wallsOnSide } from './kingdom';
@@ -59,6 +59,7 @@ export class Campaign {
   reached = 1;
   reign = 1;
   destroyedPortals = new Set<string>();
+  openedChests = new Set<string>();
   caves = new Set<number>();
   ruler: Ruler;
   prevRuler: Ruler | null = null;
@@ -76,6 +77,9 @@ export class Campaign {
     w.on('portalDestroyed', (p: Portal & { key?: string }) => {
       if (p.key) this.destroyedPortals.add(p.key);
     });
+    w.on('chestOpened', (ch: { key: string }) => {
+      if (ch.key) this.openedChests.add(ch.key);
+    });
     w.on('caveCleared', () => {
       this.caves.add(index);
       if (this.caves.size >= 5) this.onVictory?.();
@@ -87,7 +91,7 @@ export class Campaign {
   startReign(): ArrivalInfo {
     this.islands.clear();
     this.current = 1;
-    const w = generateIsland(this.seed, 1, { meta: this.meta, newReign: true, destroyedPortals: this.destroyedPortals });
+    const w = generateIsland(this.seed, 1, { meta: this.meta, newReign: true, destroyedPortals: this.destroyedPortals, openedChests: this.openedChests });
     this.hook(w, 1);
     this.islands.set(1, { world: w, leftDay: 0 });
     const m = new Monarch(0, -34 * M, this.ruler.look);
@@ -140,7 +144,7 @@ export class Campaign {
       w = entry.world;
       this.applyDecay(w, from.time.day - entry.leftDay);
     } else {
-      w = generateIsland(this.seed, dest, { meta: this.meta, destroyedPortals: this.destroyedPortals });
+      w = generateIsland(this.seed, dest, { meta: this.meta, destroyedPortals: this.destroyedPortals, openedChests: this.openedChests });
       this.hook(w, dest);
       entry = { world: w, leftDay: from.time.day };
       this.islands.set(dest, entry);
@@ -156,7 +160,12 @@ export class Campaign {
     if (cdock) {
       if (far?.hasLighthouse) cdock.stage = 'launched';
       else if (firstVisit || cdock.stage === 'launched' || cdock.stage === 'crewed') {
+        // Разбитую лодку чинят заново — со всеми деталями.
         cdock.stage = 'wreck';
+        cdock.parts = ISLANDS[dest - 1].freeParts;
+        cdock.ordered = 0;
+        cdock.building = false;
+        w.jobs.removeFor(cdock);
       }
     }
     monarchs.forEach((m, i) => {
@@ -214,6 +223,7 @@ export class Campaign {
       reached: this.reached,
       reign: this.reign,
       destroyedPortals: [...this.destroyedPortals],
+      openedChests: [...this.openedChests],
       caves: [...this.caves],
       meta: { ...this.meta, blessings: [...this.meta.blessings], gemUnlocks: [...this.meta.gemUnlocks] },
       ruler: this.ruler.key,

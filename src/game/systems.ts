@@ -229,6 +229,8 @@ export function installCrownPickup(w: World): void {
 /** Утренний колокол, вечерние сигналы. */
 export function installBells(w: World): void {
   w.time.onDawn.push(() => w.sound('bell', townX(w), 0.9));
+  // Вклад у банкира растёт раз в сутки (банк общий для всей кампании).
+  w.time.onDawn.push(() => (w.meta.bank += Banker.interest(w.meta.bank)));
   w.time.onSunset.push(() => {
     if (w.time.isBloodMoon) {
       w.banner('КРОВАВАЯ ЛУНА', 'Этой ночью Жадность придёт толпой', 5);

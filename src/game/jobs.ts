@@ -35,8 +35,9 @@ export class JobBoard {
     this.jobs = this.jobs.filter((j) => j.target !== target || (kind !== undefined && j.kind !== kind));
   }
 
-  /** Найти заказ для строителя: сначала старые (FIFO), среди них ближайшие. */
-  claim(workerId: number, x: number, allowFar: (j: Job) => boolean): Job | null {
+  /** Найти заказ для строителя: сначала старые (FIFO), среди них ближайшие.
+   * Обслуживание катапульт и баллист ночью важнее стройки, днём — в последнюю очередь. */
+  claim(workerId: number, x: number, allowFar: (j: Job) => boolean, night = false): Job | null {
     let best: Job | null = null;
     let bestScore = Infinity;
     for (const j of this.jobs) {
@@ -44,7 +45,7 @@ export class JobBoard {
       if (j.workers.size >= j.maxWorkers) continue;
       if (!allowFar(j)) continue;
       // Ремонт — приоритетнее, остальное по порядку заказа.
-      const prio = j.kind === 'repair' ? 0 : j.kind === 'operate' ? 1 : 2;
+      const prio = j.kind === 'repair' ? 0 : j.kind === 'operate' ? (night ? 1 : 3) : 2;
       const score = prio * 100000 + j.created * 10 + Math.abs(j.target.x - x) * 0.05;
       if (score < bestScore) {
         bestScore = score;

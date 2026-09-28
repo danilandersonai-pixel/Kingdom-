@@ -41,6 +41,7 @@ export class Greed extends Entity {
   private flash = 0;
   stun = 0;
   captives: number[] = [];
+  private secondHunt = 0;
   private summonTimer = 4;
   summoned = 0;
   summonedBy = 0;
@@ -194,6 +195,11 @@ export class Greed extends Entity {
       return;
     }
     if (w.time.sunUp && !this.stayDay && !this.defender) this.retreating = true;
+    // Защитники уходят, когда их портал разрушен или днём его больше не атакуют.
+    if (this.defender && !this.retreating && this.kind === 'greedling') {
+      const home = w.all<Portal>('structure').find((s) => s.id === this.homePortal);
+      if (!home || home.dead || (home.type === 'portal' && (home.destroyed || (w.time.sunUp && home.underAttack <= 0)))) this.retreating = true;
+    }
 
     // Горят на открытом солнце после рассвета.
     if (w.time.sunUp && this.kind === 'greedling' && !this.summonedBy && w.terrain.isOpen(this.x)) {
@@ -355,7 +361,9 @@ export class Greed extends Entity {
   private floaterAI(dt: number): void {
     const w = this.world;
     const cruise = GREED.floaterAltitude;
-    if (this.captives.length >= 2 || (this.captives.length && !this.diving) || this.retreating) {
+    // С одним пленником летун ещё немного ищет второго (уносит до двух).
+    if (this.captives.length === 1 && this.secondHunt > 0) this.secondHunt -= dt;
+    if (this.captives.length >= 2 || (this.captives.length && this.secondHunt <= 0 && !this.diving) || this.retreating) {
       this.y += (cruise - this.y) * Math.min(1, dt * 2);
       this.goHome(dt);
       return;
@@ -383,6 +391,7 @@ export class Greed extends Entity {
           if (!target.dead && target.role !== 'vagrant') {
             target.capturedBy = this.id;
             this.captives.push(target.id);
+            if (this.captives.length === 1) this.secondHunt = 6;
           }
           this.diving = false;
         }
@@ -399,7 +408,7 @@ export class Greed extends Entity {
 
   private breederAI(dt: number): void {
     const w = this.world;
-    if (this.retreating && !this.stayDay) {
+    if (this.retreating && (!this.stayDay || w.caveCleared)) {
       this.goHome(dt);
       return;
     }

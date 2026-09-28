@@ -52,6 +52,8 @@ export interface GenerateOptions {
   newReign?: boolean;
   /** Разрушенные порталы (сохраняются между правлениями), по индексу. */
   destroyedPortals?: Set<string>;
+  /** Уже открытые сундуки с самоцветами (сохраняются между правлениями). */
+  openedChests?: Set<string>;
 }
 
 export function generateIsland(campaignSeed: number, index: number, opts: GenerateOptions = {}): World {
@@ -162,6 +164,24 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
   }
   for (const x of campXs) occupy(x, 4 * M);
 
+  // Места под фермы — ручьи на полянах (колодец с полями занимает ~±4 м).
+  const farmSpot = (side: number, r: number): number | null => {
+    // Все свободные места на полосе 24–100 м от города; ближние — вероятнее.
+    const spots: number[] = [];
+    for (let d = 24; d <= Math.min(100, cfg.half * 0.65); d += 0.5) if (free(side * d * M, r * M)) spots.push(side * d * M);
+    if (!spots.length) return null;
+    return spots[Math.floor(Math.pow(rng.next(), 1.6) * spots.length)];
+  };
+  for (let i = 0; i < 2 + (index > 2 ? 1 : 0); i++) {
+    const side = i % 2 === 0 ? -beachSide : beachSide;
+    const x = farmSpot(side, 4.6) ?? farmSpot(-side, 4.6) ?? farmSpot(side, 3.8) ?? farmSpot(-side, 3.8);
+    if (x === null) continue;
+    occupy(x, 4.6 * M);
+    w.addNow(new Farm(x));
+    // Поляна вокруг — лес здесь не растёт.
+    clearings.push([x - 7 * M, x + 7 * M]);
+  }
+
   // Деревья.
   const kinds: TreeKind[] = ['pine', 'pine', 'tallpine', 'oak', 'oak', 'maple', 'birch'];
   for (const side of [-1, 1] as const) {
@@ -205,9 +225,12 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
   };
   for (let i = 0; i < 2; i++) w.addNow(new Chest(chestSpot(), false, 12));
   let gems = cfg.gems;
+  let gn = 0;
   while (gems > 0) {
     const n = Math.min(gems, gems === 5 ? 3 : rng.int(2, 4));
-    w.addNow(new Chest(chestSpot(), true, n));
+    const ch = w.addNow(new Chest(chestSpot(), true, n));
+    ch.key = `${index}:gems:${gn++}`;
+    if (opts.openedChests?.has(ch.key)) ch.opened = true;
     gems -= n;
   }
 
@@ -250,20 +273,6 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
   // Пристани и лодка.
   w.addNow(new CentralDock(centralDock, index));
   w.addNow(new FarDock(farDock));
-  // Места под фермы — ручьи на полянах.
-  for (let i = 0; i < 2 + (index > 2 ? 1 : 0); i++) {
-    const side = i % 2 === 0 ? -beachSide : beachSide;
-    for (let t2 = 0; t2 < 40; t2++) {
-      const x = side * rng.range(32, Math.min(62, cfg.half * 0.5)) * M;
-      if (free(x, 6 * M)) {
-        occupy(x, 6 * M);
-        clearTreesAround(x, 8 * M);
-        w.addNow(new Farm(x));
-        clearings.push([x - 8 * M, x + 8 * M]);
-        break;
-      }
-    }
-  }
   // Торговец (острова 1–2).
   if (cfg.merchant) {
     const hx = -beachSide * rng.range(40, 60) * M;

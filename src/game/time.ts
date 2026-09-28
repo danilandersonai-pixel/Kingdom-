@@ -59,7 +59,8 @@ export class DayCycle {
 
   /** Время после рассвета, когда солнце вредит Жадности. */
   get sunUp(): boolean {
-    return this.phase >= 0.015 && this.phase < TIME.sunset + 0.02;
+    // В затмение (время заморожено) солнце Жадность не жжёт.
+    return !this.frozen && this.phase >= 0.015 && this.phase < TIME.sunset + 0.02;
   }
 
   get secondsToSunset(): number {

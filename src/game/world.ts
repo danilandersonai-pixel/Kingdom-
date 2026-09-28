@@ -179,6 +179,28 @@ export class World {
     this.banners = this.banners.filter((b) => b.time < b.duration);
     this.cleanup();
     this.flushPending();
+    this.sanityT -= dt;
+    if (this.sanityT <= 0) {
+      this.sanityT = 1;
+      this.sanitizeLinks();
+    }
+  }
+
+  private sanityT = 0;
+
+  /** Забыть подданных, которых на острове уже нет (уплыли, погибли, сменили роль):
+   * иначе башни, поля и заказы строителей навсегда числятся занятыми. */
+  private sanitizeLinks(): void {
+    type Link = Entity & { job?: unknown; towerId?: number; fieldFarm?: number };
+    const people = new Map<number, Link>();
+    for (const p of this.all<Link>('person')) if (!p.dead) people.set(p.id, p);
+    for (const j of this.jobs.jobs) {
+      for (const id of j.workers) if (people.get(id)?.job !== j) j.workers.delete(id);
+    }
+    for (const s of this.all<Entity & { type?: string; archers?: number[]; fields?: Array<{ farmerId: number }> }>('structure')) {
+      if (s.archers?.length) s.archers = s.archers.filter((id) => people.get(id)?.towerId === s.id);
+      if (s.fields?.length) for (const f of s.fields) if (f.farmerId && people.get(f.farmerId)?.fieldFarm !== s.id) f.farmerId = 0;
+    }
   }
 
   private cleanup(): void {

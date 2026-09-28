@@ -128,7 +128,7 @@ export class Farm extends Structure implements FarmLike {
     }
   }
 
-  private targetStage: FarmStage = 'site';
+  targetStage: FarmStage = 'site';
 
   override finishBuild(): void {
     this.stage = this.targetStage;

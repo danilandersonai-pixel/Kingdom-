@@ -17,7 +17,7 @@ import { Portal, type PortalKind } from './structures/portal';
 import { Farm, type FarmStage } from './structures/farm';
 import { MerchantHut, Merchant, Banker, GemKeeper } from './structures/economy';
 import { CentralDock, FarDock, type BoatStage } from './structures/boat';
-import { Mine, Statue, MountSpot, DogTrap, SquadBanner, SiegeWorkshop, Catapult, Teleport, CitizenHouse } from './structures/special';
+import { Mine, Statue, MountSpot, DogTrap, SquadBanner, SiegeWorkshop, Catapult, Teleport, CitizenHouse, CrownOffer } from './structures/special';
 import { HermitHut, Hermit, Ballista, Bakery, HornPost, type HermitKind } from './structures/hermits';
 import { BombBanner, Bomb, Nest } from './structures/cave';
 import { Dog, Boar } from './entities/npc';
@@ -38,16 +38,16 @@ function base(s: Structure): Rec {
 function snapEntity(e: Entity): Rec | null {
   const id = e.id;
   if (e instanceof TownCenter) return { cls: 'TownCenter', id, ...base(e), cooldown: e.cooldown };
-  if (e instanceof Wall) return { cls: 'Wall', id, ...base(e), destroyed: e.destroyed, inner: e.inner, horn: e.horn };
+  if (e instanceof Wall) return { cls: 'Wall', id, ...base(e), destroyed: e.destroyed, rebuilding: e.rebuilding, inner: e.inner, horn: e.horn };
   if (e instanceof Tower) return { cls: 'Tower', id, ...base(e), special: e.special };
   if (e instanceof Shop) return { cls: 'Shop', id, ...base(e), kind: e.kind, stock: e.stock, max: e.max, side: e.side };
-  if (e instanceof Farm) return { cls: 'Farm', id, ...base(e), stage: e.stage, fields: e.fields.map((f) => f.progress) };
+  if (e instanceof Farm) return { cls: 'Farm', id, ...base(e), stage: e.stage, target: e.targetStage, fields: e.fields.map((f) => f.progress) };
   if (e instanceof Tree) return { cls: 'Tree', id, x: e.x, kind: e.kind, variant: e.variant, height: e.height, marked: e.marked, bp: e.buildProgress };
   if (e instanceof Stump) return { cls: 'Stump', id, x: e.x };
   if (e instanceof IslandEdge) return { cls: 'IslandEdge', id, x: e.x, side: e.side };
   if (e instanceof Rock) return { cls: 'Rock', id, x: e.x, variant: e.variant };
   if (e instanceof Camp) return { cls: 'Camp', id, x: e.x };
-  if (e instanceof Chest) return { cls: 'Chest', id, x: e.x, gems: e.gems, amount: e.amount, opened: e.opened };
+  if (e instanceof Chest) return { cls: 'Chest', id, x: e.x, gems: e.gems, amount: e.amount, opened: e.opened, key: e.key };
   if (e instanceof BerryBush) return { cls: 'BerryBush', id, x: e.x, berries: e.berries, regrow: e.regrow };
   if (e instanceof Portal) return { cls: 'Portal', id, x: e.x, kind: e.kind, side: e.side, hp: e.hp, destroyed: e.destroyed, key: (e as Portal & { key?: string }).key };
   if (e instanceof CentralDock) return { cls: 'CentralDock', id, x: e.x, stage: e.stage === 'crewed' ? 'launched' : e.stage === 'launching' ? 'repaired' : e.stage, parts: e.parts, ordered: e.ordered };
@@ -72,7 +72,7 @@ function snapEntity(e: Entity): Rec | null {
   if (e instanceof BombBanner) return { cls: 'BombBanner', id, side: e.side, bought: e.bought };
   if (e instanceof Bomb) return e.stage === 'boom' ? null : { cls: 'Bomb', id, x: e.x, stage: e.stage === 'armed' ? 'march' : e.stage };
   if (e instanceof Nest) return { cls: 'Nest', id, x: e.x, hp: e.hp };
-  if (e instanceof Person) return e.aboard ? null : { cls: 'Person', id, x: e.x, role: e.role, variant: e.variant, coins: e.coins, side: e.side, homeCamp: e.homeCamp, pikeHits: e.pikeHits };
+  if (e instanceof Person) return { cls: 'Person', id, x: e.x, role: e.role, variant: e.variant, coins: e.coins, side: e.side, homeCamp: e.homeCamp, pikeHits: e.pikeHits };
   if (e instanceof Coin) return e.homing ? null : { cls: 'Coin', id, x: e.x, kind: e.kind };
   if (e instanceof DroppedTool) return { cls: 'DroppedTool', id, x: e.x, item: e.item };
   if (e instanceof Banker) return { cls: 'Banker', id, x: e.x };
@@ -83,9 +83,12 @@ function snapEntity(e: Entity): Rec | null {
 
 function snapWorld(w: World): Rec {
   const entities: Rec[] = [];
+  const dock = w.all<Structure>('structure').find((s) => s.type === 'dock');
   for (const e of w.entities) {
     if (e.dead || e.tag === 'monarch') continue;
     const r = snapEntity(e);
+    // Команда, поднявшаяся на борт, после загрузки ждёт на пристани (колокол можно ударить снова).
+    if (r && e instanceof Person && (e.aboard || e.boarding) && dock) r.x = dock.x - 20;
     if (r) entities.push(r);
   }
   return {
@@ -132,6 +135,7 @@ function restoreWorld(r: Rec, c: Campaign): World {
         const s = new Wall(e.x, e.level);
         applyBase(s, e);
         s.destroyed = e.destroyed;
+        s.rebuilding = !!e.rebuilding;
         s.inner = e.inner;
         s.horn = e.horn;
         ent = s;
@@ -158,6 +162,7 @@ function restoreWorld(r: Rec, c: Campaign): World {
         const s = new Farm(e.x);
         applyBase(s, e);
         s.stage = e.stage as FarmStage;
+        s.targetStage = (e.target ?? e.stage) as FarmStage;
         later.push(() => {
           s.update();
           (e.fields as number[]).forEach((p, i) => {
@@ -194,6 +199,7 @@ function restoreWorld(r: Rec, c: Campaign): World {
       case 'Chest': {
         const s = new Chest(e.x, e.gems, e.amount);
         s.opened = e.opened;
+        s.key = e.key ?? '';
         ent = s;
         break;
       }
@@ -281,6 +287,7 @@ function restoreWorld(r: Rec, c: Campaign): World {
         applyBase(s, e);
         s.built = e.built;
         s.pairX = e.pairX;
+        if (s.built) later.push(() => s.addEnd());
         ent = s;
         break;
       }
@@ -433,6 +440,7 @@ export function loadCampaign(): { campaign: Campaign; world: World; monarchs: Mo
     c.reached = cm.reached;
     c.reign = cm.reign;
     c.destroyedPortals = new Set(cm.destroyedPortals);
+    c.openedChests = new Set(cm.openedChests ?? []);
     c.caves = new Set(cm.caves);
     c.meta = { ...cm.meta, blessings: new Set(cm.meta.blessings), gemUnlocks: new Set(cm.meta.gemUnlocks) };
     c.ruler = randomRuler(Number(String(data.rulerSeed).slice(1)) || cm.seed + 1);
@@ -457,6 +465,10 @@ export function loadCampaign(): { campaign: Campaign; world: World; monarchs: Mo
       return m;
     });
     for (const dog of current.all<Dog>('npc')) if (dog instanceof Dog) dog.owner = monarchs[0].id;
+    // Корона не может «пропасть» при сохранении: без короны у всех — вернуть первому,
+    // в кооперативе товарищ снова может выковать корону за 8 монет.
+    if (!monarchs.some((m) => m.hasCrown)) monarchs[0].hasCrown = true;
+    for (const m of monarchs) if (!m.hasCrown) current.addNow(new CrownOffer(m.id));
     return { campaign: c, world: current, monarchs };
   } catch (err) {
     console.error('Не удалось загрузить сохранение', err);

@@ -69,7 +69,7 @@ export class CentralDock extends Structure {
     const w = this.world;
     switch (this.stage) {
       case 'wreck':
-        this.stage = 'repair';
+        this.stage = this.parts >= BOAT_PARTS ? 'repaired' : 'repair';
         w.banner('РЕМОНТ ЛОДКИ', `Готово деталей: ${this.parts} из ${BOAT_PARTS}`);
         break;
       case 'repair':

@@ -233,6 +233,9 @@ export class Person extends Entity {
       w.sound('shieldHit', this.x, 0.6);
       const c = new Coin(this.x, 12, away * fxRng.range(10, 30), 50);
       c.noPickup = 0.4;
+      // Выбитую монету-броню сам солдат поднимет не сразу — иначе удар «бесплатный».
+      c.owner = this.id;
+      c.ownerLock = 8;
       w.add(c);
       return { kind: 'coin', item: c };
     }
@@ -555,7 +558,7 @@ export class Person extends Entity {
     const keep = this.coins;
     const side = this.side;
     this.setRole(role);
-    this.coins = role === 'squire' ? 0 : role === 'knight' ? keep : Math.max(0, keep - 1);
+    this.coins = role === 'squire' ? Math.min(keep, PEOPLE.squireCoins) : role === 'knight' ? keep : Math.max(0, keep - 1);
     if (role === 'knight') this.side = side;
     if (role === 'squire') {
       const shieldShop = this.world.all<Shop>('structure').find((s) => s.type === 'shop' && s.kind === 'shield' && Math.abs(s.x - this.x) < 20);
@@ -723,8 +726,16 @@ export class Person extends Entity {
       this.job.workers.delete(this.id);
       this.job = null;
     }
+    // Днём расчёт катапульты уходит на стройку, если есть свободный заказ.
+    if (this.job?.kind === 'operate' && w.time.isDay && fxRng.chance(dt * 0.5)) {
+      const other = w.jobs.jobs.some((j) => j.kind !== 'operate' && !j.target.dead && j.workers.size < j.maxWorkers);
+      if (other) {
+        this.job.workers.delete(this.id);
+        this.job = null;
+      }
+    }
     if (!this.job) {
-      this.job = w.jobs.claim(this.id, this.x, () => true);
+      this.job = w.jobs.claim(this.id, this.x, () => true, !w.time.isDay || w.time.phase > 0.6);
     }
     if (this.job) {
       const j = this.job;
@@ -881,7 +892,7 @@ export class Person extends Entity {
     }
     // Пополнение брони: подбираем монеты, брошенные рядом.
     if (this.coins < this.maxCarry) {
-      const c = w.nearest(w.all<Coin>('coin'), this.x, 3 * M, (e) => e.kind === 'coin' && e.y < 20 && (!e.claimedBy || e.claimedBy === this.id) && !e.homing);
+      const c = w.nearest(w.all<Coin>('coin'), this.x, 3 * M, (e) => e.kind === 'coin' && e.y < 20 && e.noPickup <= 0 && !(e.ownerLock > 0 && e.owner === this.id) && (!e.claimedBy || e.claimedBy === this.id) && !e.homing);
       if (c) {
         this.goTo(c.x, true);
         if (Math.abs(c.x - this.x) < 3) {
@@ -1008,7 +1019,7 @@ export class Person extends Entity {
     for (const m of w.all<Monarch>('monarch')) {
       if (!m.hasCrown) continue;
       if (Math.abs(m.x - this.x) > TITHE.range) continue;
-      if (Math.abs(m.velocity) > m.mount.walk * TITHE.speedFrac) continue;
+      if (Math.abs(m.velocity) > m.walkSpeed * TITHE.speedFrac) continue;
       if (m.coins >= PURSE.overflow) continue;
       this.titheTimer = TITHE.interval;
       this.coins--;

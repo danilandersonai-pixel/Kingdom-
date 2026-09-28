@@ -19,7 +19,7 @@ import { drawMap } from './ui/map';
 import { Campaign, randomRuler } from './game/campaign';
 import type { CentralDock } from './game/structures/boat';
 import { CrownOffer } from './game/structures/special';
-import { Coin } from './game/entities/pickups';
+import { Coin, DroppedCrown } from './game/entities/pickups';
 import { drawText } from './engine/font';
 import { debugSetup } from './game/debug';
 import { makeBot } from './game/bot';
@@ -57,6 +57,7 @@ export class App {
   private chooseIndex = 2;
   /** Начало правления: пока монарх стоит на месте, «вниз» меняет его облик. */
   private reroll: { x: number } | null = null;
+  private readonly hooked = new WeakSet<World>();
   settings: Settings = { master: 0.8, music: 0.6, difficulty: 'normal' };
 
   constructor(canvas: HTMLCanvasElement) {
@@ -159,14 +160,18 @@ export class App {
     this.cameras[0].snap(monarchs[0].x);
     if (monarchs[1]) this.cameras[1].snap(monarchs[1].x);
     this.hud.showDay(world.time.day);
-    world.time.onDawn.push((d) => {
-      this.hud.showDay(d);
-      this.autosave();
-    });
-    world.on('crownTaken', (ownerId: number) => this.onCrownTaken(ownerId));
-    world.on('crownKnocked', () => this.checkCrowns());
-    world.on('emptyDrop', (m: Monarch) => this.rerollRuler(m));
-    world.on('sail', (m: Monarch, dock: CentralDock) => this.openChoose(m, dock));
+    // При возвращении на остров мир тот же — подписываемся только один раз.
+    if (!this.hooked.has(world)) {
+      this.hooked.add(world);
+      world.time.onDawn.push((d) => {
+        if (this.world !== world) return;
+        this.hud.showDay(d);
+        this.autosave();
+      });
+      world.on('crownTaken', (ownerId: number) => this.onCrownTaken(ownerId));
+      world.on('emptyDrop', (m: Monarch) => this.rerollRuler(m));
+      world.on('sail', (m: Monarch, dock: CentralDock) => this.openChoose(m, dock));
+    }
     world.banner(`ОСТРОВ ${toRoman(world.island.index)}`, undefined, 4);
   }
 
@@ -178,16 +183,18 @@ export class App {
     this.world.sound('upgrade', m.x, 0.6);
   }
 
-  /** Перед горячей перезагрузкой: сохранить партию, если идёт игра. */
-  saveForReload(): boolean {
-    if (this.state === 'title' || this.state === 'help' || this.state === 'victory' || this.state === 'gameover') return false;
-    this.autosave();
-    return true;
-  }
-
+  /** Автосохранение: только настоящей партии и только пока корона не «в игре». */
   private autosave(): void {
     if (this.params.has('nosave')) return;
+    if (this.state === 'title' || this.state === 'help' || this.state === 'gameover' || this.state === 'victory') return;
+    if (this.world.all('item').some((e) => e instanceof DroppedCrown && !e.dead)) return;
     saveCampaign(this.campaign, this.world, this.monarchs);
+  }
+
+  /** Сохранять вручную можно днём, когда Жадности рядом нет (ночь не «пропустить» выходом). */
+  private canSaveNow(): boolean {
+    const w = this.world;
+    return w.time.isDay && !w.director?.eclipse && !w.all('greed').some((g) => !g.dead);
   }
 
   private onCrownTaken(ownerId: number): void {
@@ -199,10 +206,6 @@ export class App {
     }
     this.world.crownLost = true;
     this.setState('gameover');
-  }
-
-  private checkCrowns(): void {
-    void 0;
   }
 
   // ——— Состояния и меню ———
@@ -255,10 +258,13 @@ export class App {
       { label: () => `Громкость: ${Math.round(this.settings.master * 10)}`, action: () => this.volume(0.1), left: () => this.volume(-0.1), right: () => this.volume(0.1) },
       { label: () => `Музыка: ${Math.round(this.settings.music * 10)}`, action: () => this.musicVol(0.1), left: () => this.musicVol(-0.1), right: () => this.musicVol(0.1) },
       { label: () => (this.monarchs.length > 1 ? 'Второй игрок: уйти' : 'Второй игрок: присоединиться'), action: () => this.toggleCoop() },
-      { label: 'Сохранить и выйти', action: () => {
-        this.autosave();
-        this.openTitle();
-      } },
+      {
+        label: () => (this.canSaveNow() ? 'Сохранить и выйти' : hasSave() ? 'Выйти (сохранено утром)' : 'Выйти без сохранения'),
+        action: () => {
+          if (this.canSaveNow()) this.autosave();
+          this.openTitle();
+        },
+      },
     ]);
   }
 

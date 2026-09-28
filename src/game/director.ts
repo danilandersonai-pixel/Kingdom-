@@ -32,8 +32,13 @@ export class Director {
   constructor(private readonly w: World) {
     w.time.onNoon.push(() => this.pickActive());
     w.time.onNight.push(() => this.nightWave());
-    w.on('portalDefender', (p: Portal) => this.spawnNow(p, 'greedling', 1, false, true, true));
-    w.on('portalTentacle', (p: Portal, range: number) => this.tentacle(p, range));
+    // После взрыва пещеры Жадность на острове больше не появляется — ни защитники, ни щупальца, ни месть.
+    w.on('portalDefender', (p: Portal) => {
+      if (!w.caveCleared) this.spawnNow(p, 'greedling', 1, false, true, true);
+    });
+    w.on('portalTentacle', (p: Portal, range: number) => {
+      if (!w.caveCleared) this.tentacle(p, range);
+    });
     w.on('portalDestroyed', (p: Portal) => this.counterattack(p));
     this.pickActive();
   }
@@ -149,6 +154,7 @@ export class Director {
     const w = this.w;
     w.meta.portalsDestroyed++;
     const k = w.meta.portalsDestroyed;
+    if (w.caveCleared) return;
     const others = this.portals();
     const src = others.sort((a, b) => Math.abs(a.x - p.x) - Math.abs(b.x - p.x))[0];
     if (!src) return;
@@ -165,6 +171,7 @@ export class Director {
   update(dt: number): void {
     this.clock += dt;
     const w = this.w;
+    let counterSpawned = false;
     if (this.queue.length) {
       const ready = this.queue.filter((s) => s.at <= this.clock);
       if (ready.length) {
@@ -173,11 +180,15 @@ export class Director {
           const p = w.all<Structure>('structure').find((e) => e.id === s.portalId) as Portal | undefined;
           if (!p || p.destroyed) continue;
           const g = this.spawnNow(p, s.kind, s.hp, s.armored, s.stayDay);
-          if (s.counter) this.counterIds.add(g.id);
+          if (s.counter) {
+            this.counterIds.add(g.id);
+            counterSpawned = true;
+          }
         }
       }
     }
-    if (this.eclipse) {
+    // Только что выпущенные ещё не в списке мира — конец затмения проверим в следующем кадре.
+    if (this.eclipse && !counterSpawned) {
       const alive = w.all<Greed>('greed').some((g) => this.counterIds.has(g.id) && !g.dead);
       const pending = this.queue.some((s) => s.counter);
       if (!alive && !pending) {

@@ -259,9 +259,13 @@ export class Chest extends Structure {
     }
   }
 
+  /** Ключ сундука в кампании: открытые сундуки с самоцветами не наполняются снова. */
+  key = '';
+
   open(): void {
     this.opened = true;
     const w = this.world;
+    w.emit('chestOpened', this);
     w.sound('chest', this.x, 1);
     for (let i = 0; i < this.amount; i++) {
       const c = new Coin(this.x, 6, fxRng.range(-40, 40), fxRng.range(60, 120), this.gems ? 'gem' : 'coin');

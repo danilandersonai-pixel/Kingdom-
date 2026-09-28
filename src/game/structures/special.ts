@@ -414,6 +414,32 @@ export class Catapult extends Structure {
 }
 
 // ——— Телепорт на руинах портала ———
+/** Городской конец телепорта: оплата переносит к руинам портала. */
+export class TeleportEnd extends Structure {
+  readonly type = 'banner' as const;
+  constructor(readonly teleport: Teleport) {
+    super();
+    this.x = teleport.pairX;
+    this.z = 5;
+    this.payWidth = 12;
+    this.payPriority = 2;
+  }
+  override slotY(): number {
+    return 34;
+  }
+  override price(m: Monarch): number {
+    return this.teleport.dead || !this.teleport.built ? 0 : this.teleport.price(m);
+  }
+  override onPaid(m: Monarch): void {
+    this.teleport.onPaid(m);
+  }
+  override update(): void {
+    if (this.teleport.dead) this.dead = true;
+    this.x = this.teleport.pairX;
+  }
+  override draw(): void {}
+}
+
 export class Teleport extends Structure {
   readonly type = 'portal' as const;
   readonly kind = 'teleport';
@@ -453,6 +479,12 @@ export class Teleport extends Structure {
     this.built = true;
     this.pairX = townX(this.world) + 5 * M;
     this.world.jobs.removeFor(this);
+    this.addEnd();
+  }
+
+  /** Второй конец у города: там тоже можно заплатить и перенестись обратно. */
+  addEnd(): void {
+    if (!this.world.all<Structure>('structure').some((s) => s instanceof TeleportEnd && s.teleport === this)) this.world.add(new TeleportEnd(this));
   }
   lights(out: Light[]): void {
     if (this.built) {

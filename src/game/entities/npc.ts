@@ -81,6 +81,7 @@ export class Boar extends Entity {
   state: 'den' | 'charge' | 'stunned' | 'return' = 'den';
   private timer = 0;
   kind = 'boar';
+  private readonly trampled = new Set<number>();
 
   constructor(x: number) {
     super();
@@ -126,6 +127,7 @@ export class Boar extends Entity {
       case 'den':
         if (m) {
           this.state = 'charge';
+          this.trampled.clear();
           w.sound('greedScream', this.x, 0.8);
         }
         break;
@@ -142,8 +144,12 @@ export class Boar extends Entity {
           break;
         }
         this.x += this.facing * 4.5 * M * dt;
-        // Подданные на пути обезоружены.
-        for (const p of w.all<Person>('person')) if (Math.abs(p.x - this.x) < 6 && p.role !== 'vagrant') p.hitByGreed(this.x);
+        // Подданные на пути обезоружены — каждый один раз за рывок.
+        for (const p of w.all<Person>('person')) {
+          if (Math.abs(p.x - this.x) >= 6 || p.role === 'vagrant' || this.trampled.has(p.id)) continue;
+          this.trampled.add(p.id);
+          p.hitByGreed(this.x);
+        }
         if (Math.abs(dx) < 10) {
           // Удар выбивает все монеты, пустой кошелёк — корону.
           if (target.coins > 0) {
