@@ -6,8 +6,8 @@ import { makeCanvas, type Sprite } from '../engine/sprite';
 import { Rng } from '../engine/rng';
 import { limb, line, poly, px, rect, shade, ellipse } from './px';
 
-export type HeadWear = 'none' | 'hood' | 'straw' | 'cap' | 'helmet' | 'crown' | 'bandana' | 'tophat' | 'wizard';
-export type Tool = 'none' | 'bow' | 'hammer' | 'scythe' | 'sword' | 'staff' | 'pike' | 'torch' | 'bomb' | 'pack' | 'coinbag';
+export type HeadWear = 'none' | 'hood' | 'straw' | 'cap' | 'helmet' | 'crown' | 'bandana' | 'tophat' | 'wizard' | 'feather';
+export type Tool = 'none' | 'bow' | 'hammer' | 'scythe' | 'sword' | 'staff' | 'pike' | 'torch' | 'bomb' | 'pack' | 'coinbag' | 'lute';
 
 export interface HumanLook {
   skin: string;
@@ -28,6 +28,8 @@ export interface HumanLook {
   robe?: boolean;
   apron?: string;
   ghost?: boolean;
+  /** Ребёнок: короче ноги и туловище, голова той же величины. */
+  child?: boolean;
 }
 
 export type HumanAnim = 'idle' | 'walk' | 'run' | 'act' | 'panic' | 'hold' | 'sit' | 'wave';
@@ -129,6 +131,12 @@ function pose(anim: HumanAnim, t: number, look: HumanLook): Pose {
   if (look.tool === 'scythe' && anim !== 'act') p.toolAng = Math.PI * 0.92;
   if (look.tool === 'staff' || look.tool === 'pike' || look.tool === 'torch') p.toolAng = Math.PI * 0.95;
   if (look.tool === 'sword' && anim !== 'act') p.toolAng = 0.5;
+  if (look.tool === 'lute' && (anim === 'sit' || anim === 'idle' || anim === 'act')) {
+    // Левая рука на грифе, правая перебирает струны.
+    p.armB = 1.55;
+    p.armF = 0.95 + Math.abs(s) * 0.3;
+    p.elbowF = 0.35;
+  }
   return p;
 }
 
@@ -185,15 +193,16 @@ export function drawHuman(ctx: CanvasRenderingContext2D, look: HumanLook, anim: 
   const Y = (y: number) => BASE - y;
   const p = pose(anim, t, look);
   const hunch = look.hunched ? 1 : 0;
-  const hipY = 5 - p.hipDrop;
-  const legLen = 5;
+  const hipY = (look.child ? 3.4 : 5) - p.hipDrop;
+  const legLen = look.child ? 3.4 : 5;
+  const torso = look.child ? 4 : 6;
   const body = look.armor ? '#9aa4b0' : look.tunic;
   const bodyDark = shade(body, 0.74);
   const bodyLight = shade(body, 1.2);
   const pantsDark = shade(look.pants, 0.75);
 
   const shX = p.lean + hunch * 1;
-  const shY = hipY + 6 + p.bob - hunch;
+  const shY = hipY + torso + p.bob - hunch;
   const headX = shX + (look.hunched ? 1 : 0);
   const headY = shY + 0.5;
 
@@ -218,12 +227,13 @@ export function drawHuman(ctx: CanvasRenderingContext2D, look: HumanLook, anim: 
   px(ctx, X(handB[0]), Y(handB[1]), shade(look.skin, 0.85));
 
   // Ноги.
+  const thigh = legLen * 0.52;
   const drawLeg = (ang: number, knee: number, hipX: number, color: string, boot: string) => {
-    const kx = hipX + Math.sin(ang) * 2.6;
-    const ky = hipY - Math.cos(ang) * 2.6;
+    const kx = hipX + Math.sin(ang) * thigh;
+    const ky = hipY - Math.cos(ang) * thigh;
     const a2 = ang - knee;
-    const fx = kx + Math.sin(a2) * (legLen - 2.6);
-    const fy = Math.max(0, ky - Math.cos(a2) * (legLen - 2.6));
+    const fx = kx + Math.sin(a2) * (legLen - thigh);
+    const fy = Math.max(0, ky - Math.cos(a2) * (legLen - thigh));
     limb(ctx, X(hipX), Y(hipY), X(kx), Y(ky), 2, 1.8, color);
     limb(ctx, X(kx), Y(ky), X(fx), Y(fy + 0.8), 1.8, 1.6, color);
     rect(ctx, X(fx - 0.5), Y(fy + 0.5), 2, 1, boot);
@@ -349,6 +359,13 @@ function drawHeadwear(ctx: CanvasRenderingContext2D, look: HumanLook, X: (x: num
       poly(ctx, [[X(hx - 1.5), Y(hy + 1)], [X(hx + 5), Y(hy + 1)], [X(hx + 1), Y(hy + 7)]], c);
       rect(ctx, X(hx - 1.5), Y(hy + 1), 7, 1, dark);
       break;
+    case 'feather':
+      // Берет барда с длинным пером.
+      rect(ctx, X(hx - 1), Y(hy + 1), 6, 2, c);
+      rect(ctx, X(hx - 1), Y(hy), 6, 1, dark);
+      line(ctx, X(hx - 1), Y(hy + 2), X(hx - 4), Y(hy + 5), '#f4ece0');
+      px(ctx, X(hx - 4), Y(hy + 5), '#e8c860');
+      break;
     default:
       break;
   }
@@ -435,6 +452,17 @@ function drawTool(ctx: CanvasRenderingContext2D, look: HumanLook, p: Pose, X: (x
       line(ctx, X(hx + 1), Y(hy + 6), X(hx + 2), Y(hy + 7), '#c8a060');
       break;
     }
+    case 'lute': {
+      // Лютня поперёк тела: корпус у бедра, гриф к плечу; ближняя рука перебирает струны.
+      const bx = shX + 1;
+      const by = shY - 4;
+      ellipse(ctx, X(bx), Y(by), 2.2, 1.6, '#a8662a');
+      px(ctx, X(bx), Y(by), '#3a2010');
+      px(ctx, X(bx - 1), Y(by + 1), '#c88a4a');
+      line(ctx, X(bx - 1), Y(by + 1), X(bx - 4), Y(by + 4), '#6a3e1a');
+      px(ctx, X(bx - 5), Y(by + 4), '#6a3e1a');
+      break;
+    }
     case 'coinbag': {
       ellipse(ctx, X(hx), Y(hy - 2), 2, 2, '#b08a3a');
       px(ctx, X(hx), Y(hy - 0.5), '#f2c84a');
@@ -461,7 +489,9 @@ export type Role =
   | 'merchant'
   | 'banker'
   | 'ghost'
-  | 'squire';
+  | 'squire'
+  | 'child'
+  | 'bard';
 
 const SKINS = ['#e8b48a', '#d8a078', '#f0c4a0', '#b87a50', '#8a5a3a', '#f2d0b0'];
 const HAIRS = ['#3a2418', '#6a3e22', '#a06a3a', '#c8a050', '#2a2a2a', '#8a8078', '#d8d0c0'];
@@ -516,6 +546,17 @@ export function lookFor(role: Role, variant: number, kingdomColor = '#a82a2a'): 
       return { ...base, tunic: '#7a3a5a', pants: '#4a3a3a', head: 'tophat', headColor: '#3a2a3a', tool: 'pack', beard: true };
     case 'banker':
       return { ...base, tunic: '#3a4a6a', pants: '#2a2a3a', head: 'tophat', headColor: '#1e1e28', tool: 'coinbag' };
+    case 'child':
+      return {
+        ...base,
+        child: true,
+        beard: false,
+        tunic: r.pick(['#c84a3a', '#4a7ac8', '#d8b040', '#6aa048', '#c878a8']),
+        pants: r.pick(['#5a4432', '#3a4a6a', '#6a5a3a']),
+        hairStyle: r.pick(['short', 'messy', 'long'] as const),
+      };
+    case 'bard':
+      return { ...base, tunic: r.pick(['#a8323a', '#3a6a8a', '#6a3a8a']), pants: '#3a2a3a', head: 'feather', headColor: r.pick(['#2a4a3a', '#6a2a3a', '#3a3a6a']), tool: 'lute', beard: r.chance(0.5) };
     case 'ghost':
       return { ...base, tunic: '#bfe0f0', pants: '#a0c8e0', boots: '#a0c8e0', skin: '#d8f0ff', hair: '#b0d8f0', head: 'crown', headColor: '#e8f4ff', ghost: true, robe: true };
   }

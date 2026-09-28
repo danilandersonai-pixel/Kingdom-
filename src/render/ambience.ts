@@ -4,6 +4,7 @@
 import { fxRng } from '../engine/rng';
 import { blit } from '../engine/sprite';
 import { animalFrames } from '../art/animals';
+import { critterFrames } from '../art/critters';
 import type { Renderer } from './renderer';
 import type { Season } from './atmosphere';
 
@@ -20,6 +21,22 @@ interface Fish {
   dir: number;
 }
 
+/** Утиное семейство на реке: утка впереди, утята следом. */
+interface Ducks {
+  x: number;
+  dir: number;
+  n: number;
+  row: number;
+}
+
+interface Bat {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  t: number;
+}
+
 export interface AmbienceInfo {
   season: Season;
   night: number;
@@ -33,6 +50,9 @@ export class Ambience {
   private nextFlock = 8;
   private fish: Fish[] = [];
   private nextFish = 5;
+  private ducks: Ducks | null = null;
+  private nextDucks = 6;
+  private bats: Bat[] = [];
   private timer = 0;
 
   constructor(private readonly r: Renderer) {}
@@ -101,20 +121,61 @@ export class Ambience {
       if (before === 0 || (before < 0.9 && f.t >= 0.9)) r.ripples.push({ x: f.x + f.dir * f.t * 14, r: 5, life: 1 });
     }
     this.fish = this.fish.filter((f) => f.t < 1);
+
+    // Утки: весна–осень, днём, не на льду.
+    const camX = left + w / 2;
+    if (this.ducks) {
+      this.ducks.x += this.ducks.dir * 4 * dt;
+      if (Math.abs(this.ducks.x - camX) > w || info.frozen || info.night > 0.7) this.ducks = null;
+      else if (fxRng.chance(dt * 1.2)) r.ripples.push({ x: this.ducks.x - this.ducks.dir * 4, r: 3, life: 0.8 });
+    } else if (info.season !== 'winter' && !info.frozen && info.day && (this.nextDucks -= dt) <= 0) {
+      this.nextDucks = fxRng.range(30, 70);
+      const dir = fxRng.sign();
+      this.ducks = { x: camX - dir * (w / 2 + 20), dir, n: fxRng.int(2, 4), row: fxRng.int(5, 12) };
+    }
+    // Летучие мыши в сумерках и ночью (не зимой).
+    const dusk = info.night > 0.25 && info.season !== 'winter' && info.rain < 0.4;
+    if (dusk && this.bats.length < 4 && fxRng.chance(dt * 0.5)) {
+      this.bats.push({ x: fxRng.range(0, w), y: fxRng.range(r.horizonY * 0.3, r.horizonY * 0.8), vx: fxRng.range(-30, 30), vy: 0, t: 0 });
+    }
+    for (const b of this.bats) {
+      b.t += dt;
+      // Рваный полёт: резкие повороты.
+      if (fxRng.chance(dt * 2.5)) {
+        b.vx = fxRng.range(-40, 40);
+        b.vy = fxRng.range(-18, 18);
+      }
+      b.x += b.vx * dt;
+      b.y += b.vy * dt;
+    }
+    this.bats = this.bats.filter((b) => b.x > -20 && b.x < w + 20 && b.y > 5 && b.y < r.horizonY + 10 && (dusk || b.t < 2));
   }
 
-  /** Птицы — в небе, позади леса. */
+  /** Птицы и летучие мыши — в небе, позади леса. */
   drawSky(ctx: CanvasRenderingContext2D): void {
     const frames = animalFrames('bird', 'fly');
     for (const b of this.birds) {
       const f = frames[Math.floor(b.phase * 2) % frames.length];
       blit(ctx, f, Math.round(b.x), Math.round(b.y), b.vx < 0);
     }
+    const bf = critterFrames('bat', 'fly');
+    for (const b of this.bats) blit(ctx, bf[Math.floor(b.t * 14) % bf.length], Math.round(b.x), Math.round(b.y), b.vx < 0);
   }
 
-  /** Рыба — поверх воды. */
+  /** Рыба и утки — поверх воды. */
   drawWater(ctx: CanvasRenderingContext2D): void {
     const r = this.r;
+    if (this.ducks) {
+      const d = this.ducks;
+      const big = critterFrames('duck', 'swim');
+      const small = critterFrames('duckling', 'swim');
+      const bob = Math.floor(this.timer * 2) % 2;
+      blit(ctx, big[bob], r.sx(d.x), r.waterTop + d.row, d.dir < 0);
+      for (let i = 0; i < d.n; i++) {
+        const x = d.x - d.dir * (9 + i * 6) + Math.sin(this.timer * 1.3 + i) * 1.2;
+        blit(ctx, small[(bob + i) % 2], r.sx(x), r.waterTop + d.row + (i % 2), d.dir < 0);
+      }
+    }
     const frames = animalFrames('fish', 'idle');
     for (const f of this.fish) {
       const x = f.x + f.dir * f.t * 14;

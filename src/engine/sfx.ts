@@ -40,7 +40,11 @@ export type SoundName =
   | 'bark'
   | 'shieldHit'
   | 'fire'
-  | 'swing';
+  | 'swing'
+  | 'owl'
+  | 'birds'
+  | 'lute'
+  | 'cluck';
 
 export interface Sfx {
   /** pan: -1..1 — стерео по положению на экране; vol: 0..1. */

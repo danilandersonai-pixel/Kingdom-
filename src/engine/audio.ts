@@ -322,6 +322,28 @@ export class Audio implements Sfx {
       case 'swing':
         this.noiseBurst(0.18, 0.1 * v, 'bandpass', 900, { pan, slide: 2500, q: 2 });
         break;
+      case 'owl':
+        // «У-ху… у-у»: два мягких гулких тона.
+        this.tone(392, 0.32, 'sine', 0.07 * v, { pan, slide: 370, attack: 0.07, echo: true });
+        this.tone(370, 0.5, 'sine', 0.06 * v, { pan, slide: 330, attack: 0.1, at: now + 0.45, echo: true });
+        break;
+      case 'birds':
+        // Хлопанье крыльев и карканье — стая взлетает.
+        for (let i = 0; i < 5; i++) this.noiseBurst(0.05, 0.06 * v, 'bandpass', 1400 + i * 120, { pan, q: 3, at: now + i * 0.06 });
+        this.tone(720, 0.13, 'square', 0.03 * v, { pan, slide: 520, at: now + 0.08 });
+        break;
+      case 'lute': {
+        // Щипок струны: пентатоника ля-минор, тихий обертон октавой выше.
+        const notes = [220, 261.6, 293.7, 329.6, 392, 440, 523.3];
+        const f = notes[Math.floor(Math.random() * notes.length)];
+        this.tone(f, 0.9, 'triangle', 0.06 * v, { pan, attack: 0.004, echo: true });
+        this.tone(f * 2, 0.35, 'sine', 0.018 * v, { pan, attack: 0.004 });
+        break;
+      }
+      case 'cluck':
+        this.tone(640, 0.05, 'square', 0.025 * v, { pan, slide: 520 });
+        this.tone(600, 0.06, 'square', 0.022 * v, { pan, slide: 480, at: now + 0.09 });
+        break;
     }
   }
 

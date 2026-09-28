@@ -12,6 +12,7 @@ import { Portal } from './structures/portal';
 import { Person } from './entities/person';
 import { Coin } from './entities/pickups';
 import { Director } from './director';
+import { installCritters } from './critters';
 import {
   installTownSystem,
   installCampSystem,
@@ -341,6 +342,7 @@ export function installIslandSystems(w: World, index: number): void {
   installBells(w);
   installAbilities(w);
   installExtras(w, index);
+  installCritters(w);
   const director = new Director(w);
   w.systems.push(director);
   w.director = director;
