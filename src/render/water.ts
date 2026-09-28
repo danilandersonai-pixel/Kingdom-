@@ -21,19 +21,22 @@ export function drawWater(
   a: Atmosphere,
   camX: number,
   ripples: Ripple[],
+  frozen = 0,
 ): void {
   const waterH = h - waterTop;
   ctx.fillStyle = rgb(a.waterDeep);
   ctx.fillRect(0, waterTop, w, waterH);
 
+  // Зимой река замерзает: отражение почти не рябит.
+  const calm = 1 - frozen * 0.85;
   for (let r = 0; r < waterH; r++) {
     const srcY = Math.max(0, waterTop - 1 - Math.floor(r * 1.02));
     const depth = r / waterH;
-    const amp1 = Math.min(2.4, 0.35 + r * 0.045);
-    const amp2 = Math.min(1.6, r * 0.025);
+    const amp1 = Math.min(2.4, 0.35 + r * 0.045) * calm;
+    const amp2 = Math.min(1.6, r * 0.025) * calm;
     const off = Math.round(Math.sin(r * 0.9 + time * 2.4) * amp1 + Math.sin(r * 0.23 - time * 1.1 + 1.3) * amp2);
     // Иногда строка «выпадает» — даёт характерные штрихи на воде.
-    const streak = hash2(r, Math.floor(time * 3)) < 0.06 + depth * 0.08;
+    const streak = hash2(r, Math.floor(time * 3 * calm)) < (0.06 + depth * 0.08) * calm;
     if (streak) continue;
     ctx.drawImage(scene, 0, srcY, w, 1, off, waterTop + r, w, 1);
   }
@@ -48,6 +51,25 @@ export function drawWater(
   // Кромка воды у берега.
   ctx.fillStyle = rgb(mix(a.skyHorizon, a.waterDeep, 0.55), 0.55);
   ctx.fillRect(0, waterTop, w, 1);
+
+  if (frozen > 0.01) {
+    // Лёд: белёсая корка, трещины и снежные полосы, привязанные к миру.
+    ctx.fillStyle = `rgba(214,228,240,${(0.38 * frozen).toFixed(3)})`;
+    ctx.fillRect(0, waterTop, w, waterH);
+    const left0 = camX - w / 2;
+    ctx.fillStyle = `rgba(255,255,255,${(0.35 * frozen).toFixed(3)})`;
+    for (let c = Math.floor(left0 / 40) - 1; c <= Math.floor((left0 + w) / 40) + 1; c++) {
+      const hv = hash2(c, 77);
+      const x = Math.round(c * 40 + hv * 30 - left0);
+      const y = waterTop + 2 + Math.floor(hash2(c, 78) * (waterH - 6));
+      ctx.fillRect(x, y, 6 + Math.floor(hv * 18), 1);
+      ctx.fillStyle = `rgba(120,150,180,${(0.4 * frozen).toFixed(3)})`;
+      ctx.fillRect(x + 3, y + 2, 1, 2);
+      ctx.fillRect(x + 4, y + 4, 2, 1);
+      ctx.fillStyle = `rgba(255,255,255,${(0.35 * frozen).toFixed(3)})`;
+    }
+    return;
+  }
 
   // Блики: короткие горизонтальные штрихи, привязанные к миру.
   const glint: RGB = mix(a.skyHorizon, hex('#ffffff'), 0.25);

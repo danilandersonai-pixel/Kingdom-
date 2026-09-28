@@ -11,6 +11,7 @@ import { PRICES, WORK, M, PEOPLE, TC_TIERS } from '../config';
 import type { FieldSlot, FarmLike } from '../entities/person';
 import { ellipse, rect, px } from '../../art/px';
 import { passengerKind, type Hermit } from './hermits';
+import { MOUNTS, type MountId } from '../mounts';
 
 let wellSpriteCache: Sprite | null = null;
 function wellSprite(): Sprite {
@@ -91,11 +92,32 @@ export class Farm extends Structure implements FarmLike {
     if (this.stage === 'site') return PRICES.well;
     if (this.stage === 'well') return PRICES.mill;
     if (this.stage === 'mill' && passengerKind(this.world, m) === 'stable') return PRICES.stable;
+    // Конюшня: сменить скакуна на другого открытого — 3 монеты.
+    if (this.stage === 'stable' && this.nextMount(m)) return PRICES.mountSwap;
     void TC_TIERS;
     return 0;
   }
 
+  /** Следующий открытый скакун (по кругу), кроме нынешнего. */
+  private nextMount(m: Monarch): MountId | null {
+    const all = Object.keys(MOUNTS) as MountId[];
+    const open = all.filter((id) => id === 'horse' || this.world.meta.gemUnlocks.has(`mount:${id}`));
+    if (open.length < 2) return null;
+    const i = open.indexOf(m.mount.id);
+    return open[(i + 1) % open.length] === m.mount.id ? null : open[(i + 1) % open.length];
+  }
+
   override onPaid(m: Monarch): void {
+    if (this.stage === 'stable') {
+      const id = this.nextMount(m);
+      if (id) {
+        m.setMount(id);
+        m.stamina = 1;
+        this.world.banner(MOUNTS[id].name.toUpperCase(), MOUNTS[id].desc);
+        this.world.sound('neigh', this.x, 1);
+      }
+      return;
+    }
     const next: FarmStage = this.stage === 'site' ? 'well' : this.stage === 'well' ? 'mill' : 'stable';
     this.targetStage = next;
     this.startBuild(0, next === 'well' ? WORK.well : next === 'mill' ? WORK.mill : WORK.stable);

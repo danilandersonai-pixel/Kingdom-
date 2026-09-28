@@ -52,6 +52,26 @@ export function debugSetup(w: World, name: string, m: Monarch): void {
     m.x = 0;
     m.coins = 25;
   }
+  if (name === 'iron' || name === 'castle') {
+    const iron = name === 'iron';
+    w.meta.tech = iron ? 2 : 1;
+    upgradeTown(w, iron ? 7 : 6);
+    for (const side of [-1, 1] as const) {
+      const walls = wallsOnSide(w, side) as unknown as Wall[];
+      walls[0]?.grant(iron ? 5 : 4);
+      walls[1]?.grant(iron ? 5 : 3);
+      walls[2]?.grant(4);
+    }
+    const towers = w.all<Structure>('structure').filter((s) => s.type === 'tower').sort((a, b) => Math.abs(a.x) - Math.abs(b.x)) as Tower[];
+    towers.forEach((t, i) => (t.level = iron ? [6, 6, 5, 4][i] ?? 3 : [4, 4, 3, 3][i] ?? 2));
+    spawn(w, 'archer', 16, 0);
+    spawn(w, 'builder', 4, 30);
+    spawn(w, 'knight', 4, -30);
+    spawn(w, 'pikeman', 2, 40);
+    spawn(w, 'farmer', 2, 10);
+    m.x = 0;
+    m.coins = 40;
+  }
   if (name === 'rich') {
     m.coins = 40;
     m.x = 0;

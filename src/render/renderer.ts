@@ -2,7 +2,7 @@
 // → затемнение и свет → светящиеся объекты → отражение в воде → погода → интерфейс.
 
 import type { Screen } from '../engine/screen';
-import { makeCanvas } from '../engine/sprite';
+import { makeCanvas, rgb } from '../engine/sprite';
 import { Background } from './background';
 import { Ground, GROUND_H } from './ground';
 import { Lighting, type Light } from './lighting';
@@ -14,6 +14,10 @@ import { nightFactor } from './atmosphere';
 import { fxRng } from '../engine/rng';
 
 export interface FrameCallbacks {
+  /** Небо: после светил, до слоёв леса (птицы). */
+  sky?(ctx: CanvasRenderingContext2D): void;
+  /** Поверх воды, до погоды (рыба). */
+  water?(ctx: CanvasRenderingContext2D): void;
   /** Объекты мира — рисуются в слой мира и затемняются ночью. */
   world(ctx: CanvasRenderingContext2D): void;
   /** Светящиеся объекты (огонь, глаза) — поверх затемнения. */
@@ -31,6 +35,10 @@ export class Renderer {
   readonly weather = new Weather();
   readonly ripples: Ripple[] = [];
   lights: Light[] = [];
+  /** Лёд на реке (0..1): зимой река замерзает. */
+  frozen = 0;
+  /** Солнечные лучи сквозь лес (0..1). */
+  rays = 0;
   /** Атмосфера последнего кадра (для объектов, которые рисуют воду сами). */
   atmos: Atmosphere | null = null;
 
@@ -120,6 +128,39 @@ export class Renderer {
     }
   }
 
+  /** Косые солнечные лучи сквозь кроны — утром и вечером. */
+  private drawRays(ctx: CanvasRenderingContext2D, a: Atmosphere, camX: number, time: number): void {
+    const { w } = this.screen;
+    const low = 1 - Math.min(1, a.sunH * 1.6);
+    const k = this.rays * (0.35 + low * 0.65);
+    if (k < 0.02) return;
+    ctx.globalCompositeOperation = 'lighter';
+    const col = a.sunColor;
+    const cell = 150;
+    const left = camX * 0.6 - w / 2;
+    for (let c = Math.floor(left / cell) - 1; c <= Math.floor((left + w) / cell) + 1; c++) {
+      const hv = Math.abs(Math.sin(c * 12.9898) * 43758.5453) % 1;
+      if (hv < 0.45) continue;
+      const x = c * cell + hv * cell - left;
+      const width = 10 + hv * 22;
+      const alpha = k * 0.06 * (0.6 + 0.4 * Math.sin(time * 0.3 + c));
+      const top = this.horizonY - 150;
+      const g = ctx.createLinearGradient(0, top, 0, this.groundY);
+      g.addColorStop(0, rgb(col, 0));
+      g.addColorStop(0.5, rgb(col, alpha));
+      g.addColorStop(1, rgb(col, alpha * 0.4));
+      ctx.fillStyle = g;
+      ctx.beginPath();
+      ctx.moveTo(x, top);
+      ctx.lineTo(x + width, top);
+      ctx.lineTo(x + width + 70, this.groundY);
+      ctx.lineTo(x + 70, this.groundY);
+      ctx.closePath();
+      ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
   render(a: Atmosphere, phase: number, time: number, cb: FrameCallbacks): void {
     const ctx = this.screen.ctx;
     const { w, h } = this.screen;
@@ -130,7 +171,9 @@ export class Renderer {
     ctx.imageSmoothingEnabled = false;
 
     this.bg.drawSky(ctx, a, camX, w, this.horizonY, time);
+    cb.sky?.(ctx);
     this.bg.drawLayers(ctx, a, camX, w, this.groundY);
+    if (this.rays > 0.01 && a.sunH > 0.05) this.drawRays(ctx, a, camX, time);
 
     const wctx = this.worldCtx;
     wctx.globalCompositeOperation = 'source-over';
@@ -148,7 +191,8 @@ export class Renderer {
 
     this.sceneCtx.clearRect(0, 0, w, this.waterTop);
     this.sceneCtx.drawImage(this.screen.buffer, 0, 0, w, this.waterTop, 0, 0, w, this.waterTop);
-    drawWater(ctx, this.sceneCopy, this.waterTop, w, h, time, a, camX, this.ripples);
+    drawWater(ctx, this.sceneCopy, this.waterTop, w, h, time, a, camX, this.ripples, this.frozen);
+    cb.water?.(ctx);
 
     this.weather.draw(ctx, nightFactor(phase));
     cb.hud?.(ctx);

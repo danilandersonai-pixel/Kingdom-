@@ -39,7 +39,7 @@ const page = await browser.newPage({ viewport: { width, height }, deviceScaleFac
 const errors = [];
 page.on('pageerror', (e) => errors.push(String(e.stack || e)));
 page.on('console', (m) => {
-  if (m.type() === 'error' || m.type() === 'warning') errors.push(m.text());
+  if ((m.type() === 'error' || m.type() === 'warning') && !m.location().url?.endsWith('favicon.ico')) errors.push(m.text());
   if (m.type() === 'log') console.log('[page]', m.text());
 });
 await page.goto(`http://127.0.0.1:5198/?${query}`);

@@ -124,7 +124,7 @@ function sample(phase: number): ParsedKey {
 const SEASON_TINT: Record<Season, { tint: RGB; amount: number; light: RGB; lightAmount: number }> = {
   spring: { tint: hex('#3a5a3a'), amount: 0.15, light: hex('#8ab86a'), lightAmount: 0.25 },
   summer: { tint: hex('#3c4a2a'), amount: 0.1, light: hex('#a0a860'), lightAmount: 0.15 },
-  autumn: { tint: hex('#5a3a22'), amount: 0.45, light: hex('#d08a3a'), lightAmount: 0.5 },
+  autumn: { tint: hex('#7a3e1c'), amount: 0.5, light: hex('#e8903a'), lightAmount: 0.6 },
   winter: { tint: hex('#8894a8'), amount: 0.35, light: hex('#e8eef6'), lightAmount: 0.55 },
 };
 

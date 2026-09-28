@@ -241,6 +241,8 @@ export class Greed extends Entity {
         this.loot.crown.dead = true;
         w.emit('crownTaken', this.loot.crown.owner);
       }
+      // Украденные самоцветы копятся в пещере — взрыв её «выплюнет».
+      if (this.loot?.kind === 'gem') w.stolenGems++;
       for (const p of w.all<Person>('person')) {
         if (this.captives.includes(p.id)) p.dead = true;
       }

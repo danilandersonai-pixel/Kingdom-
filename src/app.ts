@@ -7,6 +7,7 @@ import { Input } from './engine/input';
 import { Loop } from './engine/loop';
 import { Audio } from './engine/audio';
 import { Renderer } from './render/renderer';
+import { Ambience } from './render/ambience';
 import { computeAtmosphere, nightFactor } from './render/atmosphere';
 import type { Light } from './render/lighting';
 import type { World } from './game/world';
@@ -42,6 +43,7 @@ export class App {
   readonly loop: Loop;
   readonly audio = new Audio();
   readonly hud = new Hud();
+  private ambience!: Ambience;
   cameras: [Camera, Camera] = [new Camera(), new Camera()];
   campaign!: Campaign;
   world!: World;
@@ -60,6 +62,7 @@ export class App {
     this.screen = new Screen(canvas);
     this.input = new Input(this.screen);
     this.renderer = new Renderer(this.screen, 1, 'spring');
+    this.ambience = new Ambience(this.renderer);
     this.loop = new Loop(
       (dt) => this.update(dt),
       () => this.render(),
@@ -102,7 +105,10 @@ export class App {
     const phase = this.params.get('phase');
     if (phase) this.world.time.restore({ day: this.world.time.day, phase: Number(phase) });
     const day = this.params.get('day');
-    if (day) this.world.time.restore({ day: Number(day), phase: this.world.time.phase });
+    if (day) {
+      this.world.time.restore({ day: Number(day), phase: this.world.time.phase });
+      this.hud.showDay(this.world.time.day);
+    }
     const coins = this.params.get('coins');
     if (coins) this.monarchs[0].coins = Number(coins);
     this.cameras[0].snap(this.monarchs[0].x);
@@ -464,6 +470,13 @@ export class App {
     this.renderer.setSeason(w.time.season);
     this.updateWeather(dt);
     this.hud.update(dt, focus);
+    // Атмосфера: лёд зимой, лучи в ясную погоду, живая природа.
+    const winter = w.time.season === 'winter';
+    const r = this.renderer;
+    r.frozen = Math.max(0, Math.min(1, r.frozen + (winter ? dt : -dt) * 0.2));
+    const clear = r.weather.kind === 'rain' ? 1 - r.weather.intensity : 1;
+    r.rays = w.time.isDay && !winter ? clear : Math.max(0, r.rays - dt);
+    this.ambience.update(dt, { season: w.time.season, night: nightFactor(w.time.phase), day: w.time.isDay, rain: r.weather.kind === 'rain' ? r.weather.intensity : 0, frozen: r.frozen > 0.5 });
   }
 
   private weatherTimer = 30;
@@ -513,6 +526,8 @@ export class App {
     r.lights = lights;
     const showHud = hud && this.state !== 'title' && this.state !== 'help';
     r.render(this.atmosphere(), w.time.phase, this.time, {
+      sky: (ctx) => this.ambience.drawSky(ctx),
+      water: (ctx) => this.ambience.drawWater(ctx),
       world: (ctx) => w.draw(ctx, r),
       emissive: (ctx) => w.drawEmissive(ctx, r),
       hud: (ctx) => {
