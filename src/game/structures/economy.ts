@@ -22,6 +22,7 @@ const DONKEY = { ...HORSE, body: '#8a8078', mane: '#4a4440', socks: undefined, b
 /** Хижина торговца в лесу. */
 export class MerchantHut extends Structure {
   readonly type = 'merchant' as const;
+  override solid = 21;
   /** Хижине — снег на крышу (самому торговцу — нет). */
   readonly snowy = true;
   constructor(x: number) {
@@ -336,6 +337,7 @@ function keeperChest(): Sprite {
 
 export class GemKeeper extends Structure {
   readonly type = 'chest' as const;
+  override solid = 8;
   constructor(x: number) {
     super();
     this.x = x;

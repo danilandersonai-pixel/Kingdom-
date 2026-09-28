@@ -173,6 +173,7 @@ export class Rock extends Structure {
 /** Лагерь бродяг: живёт, пока по обе стороны есть деревья. */
 export class Camp extends Structure {
   readonly type = 'camp' as const;
+  override solid = 23;
   vagrants: number[] = [];
   private fireT = fxRng.next() * 10;
 
@@ -233,6 +234,7 @@ export class Camp extends Structure {
 /** Сундук: открывается сам, когда монарх проезжает мимо. */
 export class Chest extends Structure {
   readonly type = 'chest' as const;
+  override solid = 6;
   gems: boolean;
   amount: number;
   opened = false;

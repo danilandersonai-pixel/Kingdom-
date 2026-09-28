@@ -92,6 +92,7 @@ export type FarmStage = 'site' | 'well' | 'mill' | 'stable';
 
 export class Farm extends Structure implements FarmLike {
   readonly type = 'farm' as const;
+  override solid = 56;
   stage: FarmStage = 'site';
   fields: FieldSlot[] = [];
   /** Хранит скакунов (конюшня). */

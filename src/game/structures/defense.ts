@@ -25,6 +25,7 @@ function completionPuff(s: Structure): void {
 
 export class Wall extends Structure implements WallLike {
   readonly type = 'wall' as const;
+  override solid = 10;
   /** Уровень построен, но стена разрушена — нужна отстройка. */
   destroyed = false;
   rebuilding = false;
@@ -207,6 +208,7 @@ export type TowerSpecial = null | 'ballista' | 'bakery' | 'knight';
 
 export class Tower extends Structure {
   readonly type = 'tower' as const;
+  override solid = 12;
   /** id лучников, закреплённых за башней. */
   archers: number[] = [];
   special: TowerSpecial = null;

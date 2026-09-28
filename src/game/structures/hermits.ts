@@ -38,6 +38,7 @@ export function chimneySmoke(w: World, x: number, dt: number): void {
 
 export class HermitHut extends Structure {
   readonly type = 'hermitHut' as const;
+  override solid = 21;
   kind: HermitKind;
   released = false;
   constructor(x: number, kind: HermitKind) {
@@ -275,6 +276,7 @@ export class Ballista extends Structure {
 /** Пекарня: хлеб приманивает бродяг из дальних лагерей — они становятся крестьянами. */
 export class Bakery extends Structure {
   readonly type = 'bakery' as const;
+  override solid = 15;
   towerId: number;
   shopId: number;
   constructor(t: Tower, shopId: number) {

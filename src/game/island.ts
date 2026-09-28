@@ -261,8 +261,10 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
   // ——— Особые объекты острова ———
   // Свободное место в лесной полосе: все подходящие точки (с обеих сторон),
   // потом — с меньшим запасом; наугад — только если места нет совсем.
+  // Последняя попытка — впритык: запас у стен и башен шире их самих, так что
+  // радиус 1.6 м ещё не даёт постройкам задеть друг друга.
   const spotIn = (sides: number[], minD: number, maxD: number, r: number): number | null => {
-    for (const rr of [r, Math.max(2 * M, r * 0.66)]) {
+    for (const rr of [r, Math.max(2 * M, r * 0.66), 1.6 * M]) {
       const spots: number[] = [];
       for (let d = minD; d <= maxD; d += M / 2) for (const sg of sides) if (free(sg * d, rr)) spots.push(sg * d);
       if (spots.length) return spots[Math.floor(rng.next() * spots.length)];
@@ -270,7 +272,11 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
     return null;
   };
   const forestSpot = (minFrac: number, maxFrac: number, r = 3 * M): number => {
-    const x = spotIn([-1, 1], minFrac * cfg.half * M, maxFrac * cfg.half * M, r) ?? rng.sign() * rng.range(minFrac, maxFrac) * cfg.half * M;
+    // Нет места в своей полосе — ищем по всему лесу, но не у самой кромки острова.
+    const x =
+      spotIn([-1, 1], minFrac * cfg.half * M, maxFrac * cfg.half * M, r) ??
+      spotIn([-1, 1], 0.22 * cfg.half * M, 0.86 * cfg.half * M, r) ??
+      rng.sign() * rng.range(minFrac, maxFrac) * cfg.half * M;
     occupy(x, r);
     return x;
   };

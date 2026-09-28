@@ -57,6 +57,8 @@ export abstract class Structure extends Entity implements Payable {
   hp = 0;
   maxHp = 0;
   payWidth = 14;
+  /** Полуширина «тела» постройки на земле: подвижные постройки её обходят. */
+  solid = 0;
   paid = 0;
   payPriority = 1;
   /** Идёт строительство (строители стучат молотками). */

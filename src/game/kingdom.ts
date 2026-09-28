@@ -25,6 +25,26 @@ export function outerWall(w: World, side: -1 | 1): WallLike | null {
   return null;
 }
 
+/**
+ * Место для подвижной постройки (мастерская, знамёна) рядом с x: пока её тело
+ * half задевает другую постройку, сдвигаемся за неё в сторону dir.
+ */
+export function clearSpot(w: World, self: Structure, x: number, half: number, dir: number): number {
+  const all = w.all<Structure>('structure');
+  for (let k = 0; k < 16; k++) {
+    let hit: Structure | null = null;
+    for (const s of all) {
+      if (s !== self && s.solid > 0 && Math.abs(s.x - x) < s.solid + half + 2) {
+        hit = s;
+        break;
+      }
+    }
+    if (!hit) return x;
+    x = hit.x + dir * (hit.solid + half + 3);
+  }
+  return x;
+}
+
 export function townX(w: World): number {
   return w.cache.townX;
 }

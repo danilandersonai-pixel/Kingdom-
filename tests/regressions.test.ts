@@ -17,6 +17,7 @@ import type { TownCenter } from '../src/game/structures/town';
 import { Teleport, Catapult } from '../src/game/structures/special';
 import { applyHermitUpgrade } from '../src/game/structures/hermits';
 import { Director } from '../src/game/director';
+import { wallsOnSide } from '../src/game/kingdom';
 import { BOAT_PARTS, M } from '../src/game/config';
 import type { World } from '../src/game/world';
 
@@ -325,6 +326,42 @@ describe('экономика и подданные', () => {
       }
     }
     expect(bad).toBe(0);
+  });
+
+  it('постройки не стоят друг на друге; мастерская и знамёна обходят их при любой крайней стене', () => {
+    const bad: string[] = [];
+    for (let seed = 1; seed <= 40; seed++) {
+      for (const isl of [1, 2, 3, 4, 5]) {
+        const w = generateIsland(seed, isl, {});
+        const all = w.all<Structure>('structure');
+        const solids = all.filter((s) => s.solid > 0);
+        for (let i = 0; i < solids.length; i++) {
+          for (let j = i + 1; j < solids.length; j++) {
+            const a = solids[i];
+            const b = solids[j];
+            if (Math.abs(a.x - b.x) < a.solid + b.solid - 2) bad.push(`${seed}/${isl}: ${a.type}@${Math.round(a.x)} ~ ${b.type}@${Math.round(b.x)}`);
+          }
+        }
+        const movers = all.filter((s) => s.type === 'catapult' || s.type === 'banner' || s.type === 'bombShop') as Array<Structure & { side: -1 | 1 }>;
+        for (const side of [-1, 1] as const) {
+          const walls = wallsOnSide(w, side);
+          for (let k = 0; k < walls.length; k++) {
+            walls.forEach((wl, i) => {
+              wl.level = i <= k ? 1 : 0;
+              wl.hp = i <= k ? 10 : 0;
+            });
+            for (const m of movers) {
+              if (m.side !== side) continue;
+              m.update(0);
+              const half = m.type === 'catapult' ? 14 : 5;
+              const hit = solids.find((s) => Math.abs(s.x - m.x) < s.solid + half);
+              if (hit) bad.push(`${seed}/${isl} стена ${k}: ${m.type}@${Math.round(m.x)} на ${hit.type}@${Math.round(hit.x)}`);
+            }
+          }
+        }
+      }
+    }
+    expect(bad.slice(0, 8)).toEqual([]);
   });
 
   it('на каждом острове 1 есть место под ферму', () => {

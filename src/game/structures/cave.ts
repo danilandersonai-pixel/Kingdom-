@@ -9,7 +9,7 @@ import type { Light } from '../../render/lighting';
 import { blit, hex } from '../../engine/sprite';
 import { bannerSprite, bombSprite, nestSprite } from '../../art/buildings';
 import { PRICES, M, GREED } from '../config';
-import { outerWall, townX } from '../kingdom';
+import { clearSpot, outerWall, townX } from '../kingdom';
 import { Greed } from '../entities/greed';
 import type { Portal } from './portal';
 import type { Person } from '../entities/person';
@@ -49,7 +49,7 @@ export class BombBanner extends Structure {
   }
   override update(): void {
     const ow = outerWall(this.world, this.side);
-    this.x = (ow ? ow.x : townX(this.world) + this.side * 12 * M) - this.side * 2 * M;
+    this.x = clearSpot(this.world, this, (ow ? ow.x : townX(this.world) + this.side * 12 * M) - this.side * 2 * M, 5, -this.side);
   }
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     if (this.tcLevel < 7 || this.world.caveCleared) return;

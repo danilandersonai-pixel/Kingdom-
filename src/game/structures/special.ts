@@ -11,7 +11,7 @@ import { mineSprite, statueSprite, bannerSprite, workshopSprite, catapultSprite,
 import { mountFrames } from '../../art/horse';
 import { PRICES, WORK, M, SIEGE, WALL_TIERS } from '../config';
 import { MOUNTS, type MountId } from '../mounts';
-import { outerWall, townX } from '../kingdom';
+import { clearSpot, outerWall, townX } from '../kingdom';
 import { Person } from '../entities/person';
 import type { Portal } from './portal';
 import type { Greed } from '../entities/greed';
@@ -26,6 +26,7 @@ function tcLevel(s: Structure): number {
 // ——— Шахты: камень (о. 2) и железо (о. 4) ———
 export class Mine extends Structure {
   readonly type = 'mill' as const;
+  override solid = 22;
   kind: 'stone' | 'iron';
   built = false;
 
@@ -96,6 +97,7 @@ const STATUE: Record<StatueKind, { gems: number; coins: number; blessing: string
 
 export class Statue extends Structure {
   readonly type = 'statue' as const;
+  override solid = 9;
   kind: StatueKind;
 
   constructor(x: number, kind: StatueKind) {
@@ -152,6 +154,7 @@ export class Statue extends Structure {
 // ——— Скакуны ———
 export class MountSpot extends Structure {
   readonly type = 'stable' as const;
+  override solid = 18;
   mount: MountId;
   /** Скакун, оставленный монархом (серый конь и т. п.). */
   leftBehind = false;
@@ -216,6 +219,7 @@ export class MountSpot extends Structure {
 // ——— Собака под упавшим деревом (о. 2) ———
 export class DogTrap extends Structure {
   readonly type = 'dogHouse' as const;
+  override solid = 20;
   freed = false;
   constructor(x: number) {
     super();
@@ -302,7 +306,8 @@ export class SquadBanner extends Structure {
   override update(): void {
     const w = this.world;
     const ow = outerWall(w, this.side);
-    this.x = (ow ? ow.x : townX(w) + this.side * 10 * M) + this.side * 2.2 * M;
+    // Знамя снаружи стены: если место занято хижиной или статуей — ещё дальше.
+    this.x = clearSpot(w, this, (ow ? ow.x : townX(w) + this.side * 10 * M) + this.side * 2.2 * M, 5, this.side);
   }
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     if (!this.visible) return;
@@ -345,10 +350,13 @@ export class SiegeWorkshop extends Structure {
   }
   override update(): void {
     const ow = outerWall(this.world, this.side);
-    if (ow) this.x = ow.x - this.side * 3.5 * M;
+    if (!ow) return;
+    let x = ow.x - this.side * 3.5 * M;
     // Не ставить мастерскую на остов лодки у причала — отодвинуть к городу.
     const dock = this.world.all<Structure>('structure').find((s) => s.type === 'dock');
-    if (dock && Math.abs(this.x - dock.x) < 44) this.x = dock.x - this.side * 44;
+    if (dock && Math.abs(x - dock.x) < 44) x = dock.x - this.side * 44;
+    // И не ставить на хижину, ферму или башню — тоже ближе к городу.
+    this.x = clearSpot(this.world, this, x, 14, -this.side);
   }
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     if (!this.enabled) return;
@@ -510,6 +518,7 @@ export class Teleport extends Structure {
 // ——— Дом горожан на месте исчезнувшего лагеря ———
 export class CitizenHouse extends Structure {
   readonly type = 'hermitHut' as const;
+  override solid = 15;
   built = false;
   citizens = 0;
   constructor(x: number) {
