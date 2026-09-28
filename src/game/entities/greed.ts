@@ -536,14 +536,18 @@ export class Greed extends Entity {
   private drawn: { f: Sprite; sx: number; sy: number } | null = null;
 
   override drawEmissive(ctx: CanvasRenderingContext2D, r: Renderer): void {
+    // Кадр берём только из этого же прохода отрисовки: если фигура была
+    // отсечена, по старым координатам ничего не рисуем.
+    const drawn = this.drawn;
+    this.drawn = null;
     // Глаза в темноте — чтобы Жадность было видно ночью.
     const night = this.world.time.isNight || this.world.time.phase > 0.62;
     if (!night) return;
     // Кромка лунного света по силуэту: в Кровавую луну — багровая.
-    if (this.drawn) {
+    if (drawn) {
       const blood = this.world.time.isBloodMoon;
       ctx.globalAlpha = blood ? 0.7 : 0.45;
-      blit(ctx, rimOf(this.drawn.f, blood ? '#ff5236' : '#8e9cd0'), this.drawn.sx, this.drawn.sy);
+      blit(ctx, rimOf(drawn.f, blood ? '#ff5236' : '#8e9cd0'), drawn.sx, drawn.sy);
       ctx.globalAlpha = 1;
     }
     const sx = r.sx(this.x) + this.facing * (this.kind === 'breeder' ? 4 : 2);

@@ -9,6 +9,9 @@
     <meta name="theme-color" content="#0b0d17" />
     <meta name="description" content="Пиксельная 2D-микростратегия: монарх на коне, монеты, жители и ночные атаки Жадности." />
     <title>Королевство</title>
+    <meta property="og:title" content="Королевство" />
+    <meta property="og:description" content="Пиксельная микростратегия: монарх на коне, монеты, жители и ночные атаки Жадности. Вся графика и звук созданы кодом." />
+    <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16' shape-rendering='crispEdges'><rect width='16' height='16' rx='3' fill='%230b0d17'/><rect x='2' y='9' width='12' height='3' fill='%23f2c84a'/><rect x='2' y='12' width='12' height='1' fill='%23b87a22'/><rect x='2' y='5' width='2' height='4' fill='%23f2c84a'/><rect x='7' y='3' width='2' height='6' fill='%23f2c84a'/><rect x='12' y='5' width='2' height='4' fill='%23f2c84a'/><rect x='4' y='7' width='1' height='2' fill='%23f2c84a'/><rect x='11' y='7' width='1' height='2' fill='%23f2c84a'/><rect x='7' y='10' width='2' height='1' fill='%23d02a3a'/><rect x='3' y='10' width='1' height='1' fill='%233a7ad8'/><rect x='12' y='10' width='1' height='1' fill='%232aa85a'/><rect x='7' y='2' width='2' height='1' fill='%23fff6c8'/></svg>" />
     <style>
       html, body {
         margin: 0;
@@ -24,6 +27,31 @@
         -webkit-tap-highlight-color: transparent;
       }
       html { box-sizing: border-box; }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+        justify-content: center;
+        gap: 14px;
+        font: 600 14px/1.2 monospace;
+        letter-spacing: 4px;
+        color: #c8b890;
+        pointer-events: none;
+        transition: opacity 0.4s;
+      }
+      #boot b {
+        font-size: 28px;
+        letter-spacing: 6px;
+        color: #f2c84a;
+        text-shadow: 0 3px 0 #2a1608;
+      }
+      #boot i {
+        font-style: normal;
+        animation: blink 1.2s steps(2) infinite;
+      }
+      @keyframes blink { 50% { opacity: 0.35; } }
       #game {
         display: block;
         width: 100%;
@@ -37,6 +65,7 @@
   </head>
   <body>
     <canvas id="game"></canvas>
+    <div id="boot"><b>КОРОЛЕВСТВО</b><i>ЗАГРУЗКА…</i></div>
     <script type="module" src="/src/main.ts"></script>
   </body>
 </html>

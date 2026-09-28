@@ -50,7 +50,19 @@ if (qs.get('scene') === 'trees') {
   (window as unknown as { __ready: boolean }).__ready = true;
   throw new Error('tree view');
 }
-const app = new App(canvas);
-app.start();
-(window as unknown as { __ready: boolean; __app: App }).__ready = true;
-(window as unknown as { __app: App }).__app = app;
+// Сначала браузер успевает показать заставку «Загрузка…», потом строится
+// мир (деревья, облака и замки рисуются кодом — на слабом телефоне это заметно).
+function launch(): void {
+  const app = new App(canvas);
+  app.start();
+  (window as unknown as { __app: App }).__app = app;
+  (window as unknown as { __ready: boolean }).__ready = true;
+  const boot = document.getElementById('boot');
+  if (boot) {
+    requestAnimationFrame(() => {
+      boot.style.opacity = '0';
+      setTimeout(() => boot.remove(), 450);
+    });
+  }
+}
+requestAnimationFrame(() => setTimeout(launch, 0));
