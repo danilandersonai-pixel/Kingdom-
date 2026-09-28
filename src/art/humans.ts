@@ -30,7 +30,7 @@ export interface HumanLook {
   ghost?: boolean;
 }
 
-export type HumanAnim = 'idle' | 'walk' | 'run' | 'act' | 'panic' | 'hold';
+export type HumanAnim = 'idle' | 'walk' | 'run' | 'act' | 'panic' | 'hold' | 'sit' | 'wave';
 
 export const HUMAN_W = 22;
 export const HUMAN_H = 30;
@@ -51,14 +51,16 @@ interface Pose {
   toolAng: number;
   /** Натяжение тетивы 0..1. */
   draw: number;
+  /** Насколько опущены бёдра (сидит). */
+  hipDrop: number;
 }
 
-const FRAMES: Record<HumanAnim, number> = { idle: 4, walk: 6, run: 6, act: 4, panic: 4, hold: 2 };
+const FRAMES: Record<HumanAnim, number> = { idle: 4, walk: 6, run: 6, act: 4, panic: 4, hold: 2, sit: 4, wave: 4 };
 
 function pose(anim: HumanAnim, t: number, look: HumanLook): Pose {
   const s = Math.sin(t * Math.PI * 2);
   const c = Math.cos(t * Math.PI * 2);
-  const p: Pose = { bob: 0, lean: 0, legF: 0, legB: 0, kneeF: 0, kneeB: 0, armF: 0.15, armB: -0.1, elbowF: 0, toolAng: 0.2, draw: 0 };
+  const p: Pose = { bob: 0, lean: 0, legF: 0, legB: 0, kneeF: 0, kneeB: 0, armF: 0.15, armB: -0.1, elbowF: 0, toolAng: 0.2, draw: 0, hipDrop: 0 };
   switch (anim) {
     case 'idle':
       p.bob = s > 0.3 ? 0.5 : 0;
@@ -98,6 +100,26 @@ function pose(anim: HumanAnim, t: number, look: HumanLook): Pose {
       p.armF = Math.PI * 0.95;
       p.armB = Math.PI * 0.9;
       p.bob = s > 0 ? 0.5 : 0;
+      break;
+    case 'sit':
+      // Сидит на бревне у костра, протянув руки к огню.
+      p.hipDrop = 2;
+      p.legF = 1.3;
+      p.legB = 1.15;
+      p.kneeF = 1.3;
+      p.kneeB = 1.15;
+      p.armF = 1.1 + s * 0.08;
+      p.armB = 0.9;
+      p.elbowF = -0.3;
+      p.lean = 0.5;
+      p.bob = s > 0.5 ? 0.4 : 0;
+      break;
+    case 'wave':
+      // Машет монарху.
+      p.armF = Math.PI * 0.8 + s * 0.35;
+      p.elbowF = 0.4 + c * 0.2;
+      p.legF = 0.08;
+      p.legB = -0.08;
       break;
     case 'act':
       actPose(p, t, look.tool);
@@ -163,7 +185,7 @@ export function drawHuman(ctx: CanvasRenderingContext2D, look: HumanLook, anim: 
   const Y = (y: number) => BASE - y;
   const p = pose(anim, t, look);
   const hunch = look.hunched ? 1 : 0;
-  const hipY = 5;
+  const hipY = 5 - p.hipDrop;
   const legLen = 5;
   const body = look.armor ? '#9aa4b0' : look.tunic;
   const bodyDark = shade(body, 0.74);

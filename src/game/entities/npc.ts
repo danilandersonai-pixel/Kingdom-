@@ -3,6 +3,7 @@
 
 import { Entity } from '../entity';
 import type { Renderer } from '../../render/renderer';
+import { groundShadow } from '../../render/shadow';
 import { blit } from '../../engine/sprite';
 import { animalFrames } from '../../art/animals';
 import { humanFrames } from '../../art/humans';
@@ -69,6 +70,7 @@ export class Dog extends Entity {
 
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
     const frames = animalFrames('dog', this.running ? 'move' : 'idle');
+    groundShadow(ctx, r.sx(this.x), r.sy(0), 7);
     blit(ctx, frames[Math.floor(this.anim * (this.running ? 12 : 3)) % frames.length], r.sx(this.x), r.sy(0), this.facing < 0);
   }
 }

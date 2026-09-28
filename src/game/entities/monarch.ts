@@ -4,6 +4,7 @@
 
 import { Entity } from '../entity';
 import type { Renderer } from '../../render/renderer';
+import { groundShadow } from '../../render/shadow';
 import type { Light } from '../../render/lighting';
 import { blit, hex } from '../../engine/sprite';
 import { mountFrames, KING, type RiderLook, type MountAnim } from '../../art/horse';
@@ -465,6 +466,7 @@ export class Monarch extends Entity {
     const frames = mountFrames(key, anim, this.mount.look, rider);
     const fps = anim === 'gallop' ? 13 * (Math.abs(this.speed) / this.runSpeed) : anim === 'walk' ? 9 * (Math.abs(this.speed) / this.walkSpeed) : anim === 'eat' ? 3 : 2.5;
     const f = frames[Math.floor(this.anim * Math.max(fps, 2)) % frames.length];
+    groundShadow(ctx, r.sx(this.x) + this.facing * 2, r.sy(0), 24, 0.28);
     blit(ctx, f, r.sx(this.x), r.sy(0), this.facing < 0);
     // Уставший конь: пар изо рта.
     if (this.tired > 0 && Math.floor(this.anim * 2) % 3 === 0) {

@@ -4,6 +4,7 @@ import type { Season } from '../render/atmosphere';
 import type { TreeKind } from '../render/treegen';
 import { townCenterSprite } from '../art/town';
 import { wallSprite, towerSprite } from '../art/buildings';
+import { humanFrames, type Role, type HumanAnim } from '../art/humans';
 
 export function treeGallery(season: Season, scale = 2): void {
   const rows: Array<[TreeKind, number]> = [
@@ -123,5 +124,39 @@ export function defenseGallery(scale = 4): void {
     const s = towerSprite(l);
     ctx.drawImage(s.img, x, 510 - s.h * scale, s.w * scale, s.h * scale);
     x += (s.w + 12) * scale;
+  }
+}
+
+/** ?scene=people — все роли: стоят, идут, работают. */
+export function peopleGallery(scale = 5): void {
+  const roles: Role[] = ['vagrant', 'peasant', 'archer', 'builder', 'farmer', 'squire', 'knight', 'pikeman', 'hermit', 'merchant', 'banker', 'ghost'];
+  const anims: HumanAnim[] = ['idle', 'walk', 'act'];
+  const cw = 22 * scale;
+  const ch = 30 * scale;
+  const W = roles.length * (cw + 6) + 20;
+  const H = anims.length * 2 * (ch + 6) + 20;
+  const c = document.createElement('canvas');
+  c.width = W;
+  c.height = H;
+  for (const el of [document.documentElement, document.body]) {
+    el.style.margin = '0';
+    el.style.overflow = 'visible';
+    el.style.height = 'auto';
+  }
+  document.body.appendChild(c);
+  const ctx = c.getContext('2d')!;
+  ctx.imageSmoothingEnabled = false;
+  ctx.fillStyle = '#7f9fbf';
+  ctx.fillRect(0, 0, W, H);
+  let y = 10;
+  for (const anim of anims) {
+    for (const v of [0, 3]) {
+      roles.forEach((role, i) => {
+        const frames = humanFrames(role, v, anim);
+        const f = frames[1 % frames.length];
+        ctx.drawImage(f.img, 10 + i * (cw + 6), y, cw, ch);
+      });
+      y += ch + 6;
+    }
   }
 }

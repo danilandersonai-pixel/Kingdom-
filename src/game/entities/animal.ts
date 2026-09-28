@@ -3,6 +3,7 @@
 
 import { Entity } from '../entity';
 import type { Renderer } from '../../render/renderer';
+import { groundShadow } from '../../render/shadow';
 import { blit } from '../../engine/sprite';
 import { animalFrames, type AnimalKind } from '../../art/animals';
 import { M, PEOPLE } from '../config';
@@ -135,6 +136,7 @@ export class Animal extends Entity {
     const frames = animalFrames(this.kind, anim);
     const fps = moving ? (this.kind === 'rabbit' ? 10 : 9) : 2;
     const f = frames[Math.floor(this.anim * fps) % frames.length];
+    groundShadow(ctx, r.sx(this.x), r.sy(0), this.kind === 'rabbit' ? 5 : 11);
     blit(ctx, f, r.sx(this.x), r.sy(0), this.facing < 0);
   }
 }

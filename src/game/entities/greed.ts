@@ -4,6 +4,7 @@
 
 import { Entity } from '../entity';
 import type { Renderer } from '../../render/renderer';
+import { groundShadow } from '../../render/shadow';
 import { blit } from '../../engine/sprite';
 import { greedFrames, maskSprite, GREED_SIZE, type GreedKind, type GreedAnim } from '../../art/greed';
 import { GREED, M } from '../config';
@@ -507,6 +508,8 @@ export class Greed extends Entity {
     }
     const sx = r.sx(this.x);
     const sy = r.sy(this.y + jy);
+    const sw = this.kind === 'breeder' ? 22 : this.kind === 'floater' ? 12 : 7;
+    groundShadow(ctx, sx, r.sy(0), sw, this.kind === 'floater' || this.y + jy > 6 ? 0.12 : 0.26);
     blit(ctx, f, sx, sy, this.facing < 0);
     if (this.masked && this.maxHp >= 3) {
       // Узорная маска у прочных гридлингов.

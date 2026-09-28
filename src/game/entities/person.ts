@@ -5,6 +5,7 @@
 import { Entity } from '../entity';
 import type { Renderer } from '../../render/renderer';
 import { blit } from '../../engine/sprite';
+import { groundShadow } from '../../render/shadow';
 import { humanFrames, type HumanAnim, type Role as ArtRole } from '../../art/humans';
 import { M, PEOPLE, TITHE, PURSE, TOWER_TIERS } from '../config';
 import { Coin, DroppedTool } from './pickups';
@@ -85,6 +86,10 @@ export class Person extends Entity {
   private wanderTimer = 0;
   private hop = 0;
   private stepPhase = fxRng.next();
+  /** Косметика: машет проезжающему монарху. */
+  private waveT = 0;
+  private waveCd = fxRng.range(2, 8);
+  private waveDir: 1 | -1 = 1;
   kingdomColor = '#a82a2a';
 
   constructor(x: number, role: Role, variant: number) {
@@ -283,6 +288,19 @@ export class Person extends Entity {
     const w = this.world;
     if (this.hop > 0) this.hop -= dt;
     if (this.aura > 0) this.aura -= dt;
+    // Помахать монарху, который проезжает мимо (только стоящие без дела, днём).
+    if (this.waveT > 0) this.waveT -= dt;
+    else if ((this.waveCd -= dt) <= 0) {
+      this.waveCd = fxRng.range(1, 3);
+      if (this.role !== 'vagrant' && this.moveSpeed === 0 && !this.action && this.y === 0 && w.time.isDay) {
+        const m = w.nearest(w.all<Monarch>('monarch'), this.x, 18, (e) => e.hasCrown && Math.abs(e.velocity) > 15);
+        if (m) {
+          this.waveT = 1.4;
+          this.waveCd = fxRng.range(25, 50);
+          this.waveDir = m.x > this.x ? 1 : -1;
+        }
+      }
+    }
     if (this.capturedBy) {
       const g = w.all<Greed>('greed').find((e) => e.id === this.capturedBy);
       if (!g || g.dead) {
@@ -1040,12 +1058,41 @@ export class Person extends Entity {
     if (this.action) anim = this.action;
     else if (this.moveSpeed > 0) anim = this.running ? 'run' : 'walk';
     if (this.capturedBy) anim = 'panic';
+    let facing = this.facing;
+    if (anim === 'idle' && this.y === 0) {
+      if (this.waveT > 0) {
+        anim = 'wave';
+        facing = this.waveDir;
+      } else {
+        // Ночью у огня садятся погреться — у городского костра или у костра своего лагеря.
+        const w = this.world;
+        if (!w.time.isDay || w.time.phase > 0.6) {
+          const tcLit = w.all<Structure>('structure').some((s) => s.type === 'townCenter' && s.level >= 1);
+          const fire = this.role === 'vagrant' ? w.all<Structure>('structure').find((s) => s.id === this.homeCamp)?.x : this.isSoldier || !tcLit ? undefined : townX(w);
+          if (fire !== undefined && Math.abs(fire - this.x) < 30 && Math.abs(fire - this.x) > 4) {
+            anim = 'sit';
+            facing = fire > this.x ? 1 : -1;
+          }
+        }
+      }
+    }
     const artRole: ArtRole = this.role === 'villager' ? 'peasant' : (this.role as ArtRole);
     const frames = humanFrames(artRole, this.variant % 6, anim, this.kingdomColor);
-    const fps = anim === 'run' ? 12 : anim === 'walk' ? 8 : anim === 'act' ? 8 : 3;
+    const fps = anim === 'run' ? 12 : anim === 'walk' ? 8 : anim === 'act' || anim === 'wave' ? 8 : 3;
     const f = frames[Math.floor((this.anim + this.stepPhase) * fps) % frames.length];
     const hopY = this.hop > 0 ? Math.sin((this.hop / 0.25) * Math.PI) * 3 : 0;
-    blit(ctx, f, r.sx(this.x), r.sy(this.y + hopY), this.facing < 0);
+    const sx = r.sx(this.x);
+    if (this.y < 1 && !this.capturedBy) groundShadow(ctx, sx, r.sy(0), 7);
+    blit(ctx, f, sx, r.sy(this.y + hopY), facing < 0);
+    // Монеты для монарха — мешочек на поясе.
+    if (this.coins > 0 && !this.isSoldier && this.role !== 'vagrant' && anim !== 'sit') {
+      const bx = sx - facing * 3;
+      const by = r.sy(this.y + 7);
+      ctx.fillStyle = '#6a4a2a';
+      ctx.fillRect(bx - 1, by, 2, 2);
+      ctx.fillStyle = '#f2c84a';
+      ctx.fillRect(bx - (facing > 0 ? 1 : 0), by, 1, 1);
+    }
     // Монеты-броня у оруженосца и рыцаря — маленький мешочек.
     if (this.isSoldier && this.coins > 0 && this.aura <= 0) {
       ctx.fillStyle = '#f2c84a';
