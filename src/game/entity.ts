@@ -5,7 +5,7 @@ import type { Renderer } from '../render/renderer';
 import type { Light } from '../render/lighting';
 import type { World } from './world';
 
-export type EntityTag = 'monarch' | 'coin' | 'item' | 'person' | 'greed' | 'animal' | 'structure' | 'projectile' | 'fx';
+export type EntityTag = 'monarch' | 'coin' | 'item' | 'person' | 'greed' | 'animal' | 'structure' | 'projectile' | 'fx' | 'npc';
 
 let nextId = 1;
 

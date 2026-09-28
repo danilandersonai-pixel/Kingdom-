@@ -14,6 +14,8 @@ import { DroppedCrown } from './entities/pickups';
 import { wallsOnSide, kingdomEdge, townX, outerWall } from './kingdom';
 import { fxRng } from '../engine/rng';
 import { HUMAN_VARIANTS } from '../art/humans';
+import { Banker, GemKeeper } from './structures/economy';
+import type { CentralDock } from './structures/boat';
 
 /** Эффекты тиров городского центра. */
 export function installTownSystem(w: World): void {
@@ -31,6 +33,25 @@ export function installTownSystem(w: World): void {
     if (level >= 5) {
       grantInnerWalls(w, 3);
       grantInnerTowers(w, 2);
+    }
+    if (level >= 4 && !w.all('npc').some((e) => e instanceof Banker)) {
+      w.add(new Banker(tx - 2 * M));
+      w.banner('БАНКИР', 'Бросайте монеты рядом с ним — вклад растёт на 7 % в день');
+    }
+    if (level >= 5 && !hasShop('pike')) {
+      const pike = new Shop(tx + 9 * M, 'pike');
+      // Лавке пик нужна каменная (или железная) стена в секторе.
+      pike.condition = () => w.all<Wall>('structure').some((s) => s.type === 'wall' && s.blocks && s.level >= 3);
+      w.add(pike);
+    }
+    if (level >= 6 && !w.all<Structure>('structure').some((s) => (s as GemKeeper).isGemKeeper)) {
+      const dock = w.all<Structure>('structure').find((s) => s.type === 'dock') as CentralDock | undefined;
+      if (dock) w.add(new GemKeeper(dock.x - w.island.beachSide * 3 * M));
+    }
+    if (level >= 7 && !hasShop('sword')) {
+      const forge = new Shop(tx - 9 * M, 'sword');
+      forge.condition = () => w.meta.tech >= 2;
+      w.add(forge);
     }
     if (level >= 6 && !hasShop('shield')) {
       for (const side of [-1, 1] as const) {

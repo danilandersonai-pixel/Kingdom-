@@ -56,7 +56,7 @@ export function arrowSprite(): Sprite {
   return arrow;
 }
 
-export type RackItem = 'bow' | 'hammer' | 'scythe' | 'shield' | 'bomb' | 'pike';
+export type RackItem = 'bow' | 'hammer' | 'scythe' | 'shield' | 'bomb' | 'pike' | 'sword' | 'bread';
 
 const rackCache = new Map<RackItem, Sprite>();
 export function rackItemSprite(item: RackItem): Sprite {
@@ -98,6 +98,15 @@ export function rackItemSprite(item: RackItem): Sprite {
     case 'pike':
       line(ctx, 4, 2, 4, 10, '#7a5230');
       line(ctx, 4, 0, 4, 2, '#d0d4d8');
+      break;
+    case 'bread':
+      ellipse(ctx, 4, 7, 4, 2.5, '#c8883a');
+      ellipse(ctx, 4, 6, 3, 1.5, '#e0a858');
+      break;
+    case 'sword':
+      line(ctx, 4, 0, 4, 7, '#dde2e8');
+      line(ctx, 2, 7, 6, 7, '#a08040');
+      line(ctx, 4, 8, 4, 10, '#6a4a2a');
       break;
   }
   s = { img: c, w: 9, h: 11, ax: 4, ay: 11 };

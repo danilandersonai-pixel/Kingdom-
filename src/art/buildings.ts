@@ -319,8 +319,8 @@ export function townCenterSprite(level: number, banner = '#a82a2a'): Sprite {
 }
 
 // ——— Лавки инструментов ———
-export type ShopKind = 'bow' | 'hammer' | 'scythe' | 'shield' | 'bomb' | 'pike';
-const AWNING: Record<ShopKind, string> = { bow: '#4a7a3a', hammer: '#9a5a2a', scythe: '#c8a040', shield: '#a82a2a', bomb: '#5a5a6a', pike: '#6a4a8a' };
+export type ShopKind = 'bow' | 'hammer' | 'scythe' | 'shield' | 'bomb' | 'pike' | 'sword' | 'bread';
+const AWNING: Record<ShopKind, string> = { bow: '#4a7a3a', hammer: '#9a5a2a', scythe: '#c8a040', shield: '#a82a2a', bomb: '#5a5a6a', pike: '#6a4a8a', sword: '#4a4e56', bread: '#c87a3a' };
 
 export function shopSprite(kind: ShopKind): Sprite {
   return build(`shop:${kind}`, 24, 22, (ctx, w, h) => {
@@ -645,5 +645,102 @@ export function scaffoldSprite(w: number, h: number): Sprite {
     rect(ctx, w - 1, 0, 1, h, WOOD_L);
     for (let y = 2; y < h; y += 7) rect(ctx, 0, y, w, 1, WOOD);
     for (let y = 2; y + 7 < h; y += 7) line(ctx, 0, y, Math.min(w - 1, 7), y + 7, WOOD_D);
+  });
+}
+
+// ——— Шахты ———
+export function mineSprite(kind: 'stone' | 'iron', built: boolean): Sprite {
+  return build(`mine:${kind}:${built}`, 44, 60, (ctx, w, h) => {
+    if (kind === 'stone') {
+      // Две каменные колонны: левая более чем вдвое выше правой.
+      masonry(ctx, 6, h - 56, 12, 56, 121, '#9a9a9e');
+      masonry(ctx, 24, h - 24, 12, 24, 123, '#9a9a9e');
+      if (built) {
+        rect(ctx, 18, h - 10, 6, 10, '#2a2226');
+        line(ctx, 4, h - 1, 40, h - 1, WOOD_D);
+        rect(ctx, 30, h - 30, 8, 5, WOOD);
+      }
+    } else {
+      // Огромная красная глыба.
+      ellipse(ctx, w / 2, h - 18, 20, 18, '#8a3a2a');
+      ellipse(ctx, w / 2 - 4, h - 24, 12, 10, '#a84a32');
+      for (let i = 0; i < 14; i++) px(ctx, 8 + ((i * 7) % 28), h - 6 - ((i * 5) % 26), '#c86a4a');
+      if (built) {
+        rect(ctx, w / 2 - 4, h - 10, 8, 10, '#1e1414');
+        line(ctx, 2, h - 1, 42, h - 1, WOOD_D);
+      }
+    }
+  });
+}
+
+export function bannerSprite(color: string): Sprite {
+  return build(`banner:${color}`, 12, 26, (ctx) => {
+    rect(ctx, 2, 0, 1, 26, WOOD_D);
+    poly(ctx, [[3, 1], [11, 2], [10, 12], [3, 11]], color);
+    px(ctx, 6, 5, '#f2c84a');
+    px(ctx, 7, 6, '#f2c84a');
+    px(ctx, 5, 6, '#f2c84a');
+    px(ctx, 6, 7, '#f2c84a');
+  });
+}
+
+export function workshopSprite(): Sprite {
+  return build('workshop', 28, 20, (ctx, w, h) => {
+    rect(ctx, 2, h - 12, w - 4, 12, WOOD);
+    for (let x = 3; x < w - 2; x += 3) rect(ctx, x, h - 12, 1, 12, WOOD_D);
+    poly(ctx, [[0, h - 11], [w, h - 11], [w - 5, h - 19], [5, h - 19]], '#6a6a72');
+    rect(ctx, 10, h - 8, 8, 8, '#2a1a12');
+  });
+}
+
+export function teleportSprite(active: boolean): Sprite {
+  return build(`teleport:${active}`, 20, 30, (ctx, w, h) => {
+    masonry(ctx, 1, h - 26, 4, 26, 131);
+    masonry(ctx, w - 5, h - 26, 4, 26, 133);
+    masonry(ctx, 1, h - 29, w - 2, 4, 135);
+    if (active) {
+      ellipse(ctx, w / 2, h - 13, 5, 11, '#6ad0e0');
+      ellipse(ctx, w / 2, h - 13, 3, 8, '#c8f8ff');
+    }
+  });
+}
+
+export function citizenHouseSprite(): Sprite {
+  return build('citizenHouse', 30, 26, (ctx, w, h) => {
+    rect(ctx, 3, h - 14, w - 6, 14, '#b09a7a');
+    for (let x = 4; x < w - 3; x += 4) rect(ctx, x, h - 14, 1, 14, '#8a7a5a');
+    poly(ctx, [[0, h - 13], [w, h - 13], [w / 2, h - 25]], '#8a4a2a');
+    rect(ctx, w / 2 - 3, h - 9, 6, 9, '#2a1a12');
+    rect(ctx, 6, h - 11, 3, 3, '#e8c060');
+    rect(ctx, w - 9, h - 11, 3, 3, '#e8c060');
+  });
+}
+
+export function bombSprite(): Sprite {
+  return build('bomb', 22, 20, (ctx) => {
+    rect(ctx, 2, 14, 18, 3, WOOD);
+    ellipse(ctx, 6, 18, 2.5, 2.5, WOOD_D);
+    ellipse(ctx, 16, 18, 2.5, 2.5, WOOD_D);
+    ellipse(ctx, 11, 8, 7, 7, '#2a2a32');
+    ellipse(ctx, 9, 6, 2, 2, '#5a5a64');
+    line(ctx, 13, 2, 16, 0, '#c8a060');
+  });
+}
+
+export function nestSprite(): Sprite {
+  return build('nest', 26, 22, (ctx, w, h) => {
+    ellipse(ctx, w / 2, h - 7, 12, 8, '#1e1226');
+    ellipse(ctx, w / 2, h - 9, 8, 6, '#3a1e4a');
+    for (let i = 0; i < 5; i++) px(ctx, 6 + i * 3, h - 12 + (i % 2), '#f0ebe0');
+  });
+}
+
+export function dogTrapSprite(): Sprite {
+  return build('dogTrap', 40, 14, (ctx, w, h) => {
+    // Упавшее дерево.
+    poly(ctx, [[0, h - 6], [w, h - 10], [w, h - 5], [0, h - 1]], '#5a3e28');
+    line(ctx, 0, h - 6, w, h - 10, '#7a5638');
+    ellipse(ctx, w - 4, h - 8, 5, 4, '#3a5a36');
+    void w;
   });
 }

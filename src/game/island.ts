@@ -23,6 +23,18 @@ import {
 } from './systems';
 import type { TreeKind } from '../render/treegen';
 import { HUMAN_VARIANTS } from '../art/humans';
+import { Farm } from './structures/farm';
+import { MerchantHut, Merchant } from './structures/economy';
+import { CentralDock, FarDock } from './structures/boat';
+import { Mine, Statue, MountSpot, DogTrap, SquadBanner, SiegeWorkshop, Teleport, CitizenHouse } from './structures/special';
+import { HermitHut, HERMITS, type HermitKind } from './structures/hermits';
+import { BombBanner, Nest } from './structures/cave';
+import { Boar, Dog } from './entities/npc';
+import { installAbilities } from './abilities';
+import type { MountId } from './mounts';
+import type { StatueKind } from '../art/buildings';
+import type { Monarch } from './entities/monarch';
+import type { Structure } from './structures/structure';
 
 export interface IslandLayout {
   /** Места под стены (в пикселях от центра). */
@@ -212,6 +224,76 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
     if (free(x, M)) w.addNow(new Rock(x, rng.int(0, 3)));
   }
 
+  // ——— Особые объекты острова ———
+  const forestSpot = (minFrac: number, maxFrac: number, r = 3 * M): number => {
+    for (let t2 = 0; t2 < 80; t2++) {
+      const x = rng.sign() * rng.range(minFrac, maxFrac) * cfg.half * M;
+      if (free(x, r)) {
+        occupy(x, r);
+        return x;
+      }
+    }
+    const x = rng.sign() * rng.range(minFrac, maxFrac) * cfg.half * M;
+    occupy(x, r);
+    return x;
+  };
+  const clearTreesAround = (x: number, r: number) => {
+    for (const tr of w.all<Structure>('structure')) {
+      if (tr.type === 'tree' && Math.abs(tr.x - x) < r) {
+        tr.dead = true;
+        w.terrain.addTree(tr.x, -1);
+      }
+    }
+  };
+  // Пристани и лодка.
+  w.addNow(new CentralDock(centralDock, index));
+  w.addNow(new FarDock(farDock));
+  // Места под фермы — ручьи на полянах.
+  for (let i = 0; i < 2 + (index > 2 ? 1 : 0); i++) {
+    const side = i % 2 === 0 ? -beachSide : beachSide;
+    for (let t2 = 0; t2 < 40; t2++) {
+      const x = side * rng.range(32, Math.min(62, cfg.half * 0.5)) * M;
+      if (free(x, 6 * M)) {
+        occupy(x, 6 * M);
+        clearTreesAround(x, 8 * M);
+        w.addNow(new Farm(x));
+        clearings.push([x - 8 * M, x + 8 * M]);
+        break;
+      }
+    }
+  }
+  // Торговец (острова 1–2).
+  if (cfg.merchant) {
+    const hx = -beachSide * rng.range(40, 60) * M;
+    occupy(hx, 3 * M);
+    const hut = w.addNow(new MerchantHut(hx));
+    w.addNow(new Merchant(hx, hut.id, 1));
+  }
+  // Технологии.
+  if (index === 2) w.addNow(new Mine(forestSpot(0.55, 0.8, 5 * M), 'stone'));
+  if (index === 4) w.addNow(new Mine(forestSpot(0.55, 0.8, 5 * M), 'iron'));
+  if (index === 2) w.addNow(new DogTrap(forestSpot(0.3, 0.6)));
+  // Статуи, отшельники и скакуны каждого острова.
+  const statues: Record<number, StatueKind[]> = { 1: ['archer'], 2: ['scythe'], 3: ['builder'], 5: ['knight'] };
+  for (const k of statues[index] ?? []) w.addNow(new Statue(forestSpot(0.3, 0.7), k));
+  for (const [kind, h] of Object.entries(HERMITS)) if (h.island === index) w.addNow(new HermitHut(forestSpot(0.35, 0.75), kind as HermitKind));
+  const mounts: Record<number, MountId[]> = { 1: ['griffin'], 2: ['stag'], 3: ['warhorse', 'draft'], 4: ['bear', 'lizard'], 5: ['unicorn'] };
+  for (const id of mounts[index] ?? []) {
+    const x = forestSpot(0.3, 0.72, 4 * M);
+    clearTreesAround(x, 3 * M);
+    w.addNow(new MountSpot(x, id));
+  }
+  // Кабан (зимой) — логово в лесу.
+  w.addNow(new Boar(forestSpot(0.45, 0.8)));
+  // Знамёна атаки, осадные мастерские, знамя бомбы.
+  for (const side of [-1, 1] as const) {
+    w.addNow(new SquadBanner(side));
+    w.addNow(new SiegeWorkshop(side));
+  }
+  w.addNow(new BombBanner(cliffSide));
+  // Гнёзда пещеры у утёса (опасны, только пока идёт бомба).
+  for (let i = 0; i < 5; i++) w.addNow(new Nest(cliffSide * (L - (22 + i * 9) * M)));
+
   // ——— Трава на равнинах ———
   const t = w.terrain;
   for (let i = 0; i < t.cells; i++) {
@@ -231,7 +313,14 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
     }
   }
 
-  // ——— Системы ———
+  installIslandSystems(w, index);
+  w.layout = { walls: wallSpots, towers: towerSpots, clearings, beachSide, centralDock, farDock };
+  void tc;
+  return w;
+}
+
+/** Системы острова — общие для нового и загруженного острова. */
+export function installIslandSystems(w: World, index: number): void {
   installTownSystem(w);
   installCampSystem(w);
   installDefenseSystem(w);
@@ -239,10 +328,35 @@ export function generateIsland(campaignSeed: number, index: number, opts: Genera
   installTerrainGrowth(w);
   installCrownPickup(w);
   installBells(w);
+  installAbilities(w);
+  installExtras(w, index);
   const director = new Director(w);
   w.systems.push(director);
   w.director = director;
-  w.layout = { walls: wallSpots, towers: towerSpots, clearings, beachSide, centralDock, farDock };
-  void tc;
+}
+
+/** Пустой мир острова с теми же размерами (для загрузки сохранения). */
+export function emptyIsland(campaignSeed: number, index: number, beachSide: -1 | 1, meta: CampaignMeta): World {
+  const cfg = ISLANDS[index - 1];
+  const L = cfg.half * M;
+  const seed = (campaignSeed * 7919 + index * 104729) >>> 0;
+  const w = new World({ index, seed, left: -L, right: L, beachSide, tech: 0 });
+  w.meta = meta;
+  attachTerrain(w);
+  w.cache.townX = 0;
   return w;
+}
+
+/** Реакции острова на события: телепорты на руинах, дома горожан, собака. */
+function installExtras(w: World, index: number): void {
+  w.on('portalDestroyed', (p: Portal) => {
+    if (p.kind !== 'cliff') w.add(new Teleport(p.x));
+  });
+  w.on('campGone', (c: Structure) => w.add(new CitizenHouse(c.x)));
+  w.on('dogFreed', (_t: Structure, m: Monarch) => w.add(new Dog(m.x - m.facing * 20, m.id)));
+  w.time.onDawn.push((day) => {
+    for (const s of w.all<Structure>('structure')) (s as unknown as { dawn?: (d: number) => void }).dawn?.(day);
+    w.hornCall = null;
+  });
+  void index;
 }

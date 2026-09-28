@@ -86,6 +86,12 @@ export class World {
   /** Кэш часто используемых значений. */
   cache = { townX: 0 };
   director: Director | null = null;
+  /** Пещера острова взорвана — Жадность больше не появляется. */
+  caveCleared = false;
+  /** Самоцветы, унесённые Жадностью (вернёт взрыв пещеры). */
+  stolenGems = 0;
+  /** Рог созвал защитников к стене этой стороны (до утра). */
+  hornCall: -1 | 1 | null = null;
   layout: IslandLayout | null = null;
   private listeners = new Map<string, Array<(...args: unknown[]) => void>>();
 
@@ -97,6 +103,15 @@ export class World {
 
   emit(event: string, ...args: unknown[]): void {
     for (const fn of this.listeners.get(event) ?? []) fn(...args);
+  }
+
+  /** Запрос с ответом: первый обработчик, вернувший не undefined. */
+  private queries = new Map<string, (...args: any[]) => unknown>();
+  answer(name: string, fn: (...args: any[]) => unknown): void {
+    this.queries.set(name, fn);
+  }
+  emitQuery(name: string, ...args: unknown[]): unknown {
+    return this.queries.get(name)?.(...args);
   }
 
   constructor(island: IslandInfo) {
@@ -129,6 +144,18 @@ export class World {
     this.add(e);
     this.flushPending();
     return e;
+  }
+
+  /** Немедленно убрать сущность из мира (для переноса на другой остров). */
+  detach(e: Entity): void {
+    const i = this.entities.indexOf(e);
+    if (i >= 0) this.entities.splice(i, 1);
+    const arr = this.tags.get(e.tag);
+    if (arr) {
+      const j = arr.indexOf(e);
+      if (j >= 0) arr.splice(j, 1);
+    }
+    this.pending = this.pending.filter((p) => p !== e);
   }
 
   all<T extends Entity = Entity>(tag: EntityTag): T[] {

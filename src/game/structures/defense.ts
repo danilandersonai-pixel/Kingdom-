@@ -9,6 +9,7 @@ import { wallSprite, towerSprite, scaffoldSprite, TOWER_PLATFORM } from '../../a
 import { WALL_TIERS, TOWER_TIERS, TC_CAPS } from '../config';
 import { fxRng } from '../../engine/rng';
 import type { WallLike } from '../kingdom';
+import { passengerKind, towerSpecialPrice, wallHornPrice, applyHermitUpgrade } from './hermits';
 
 function tcLevel(s: Structure): number {
   const tc = s.world.all<Structure>('structure').find((e) => e.type === 'townCenter');
@@ -53,9 +54,11 @@ export class Wall extends Structure implements WallLike {
     return [10, 20, 28, 34, 40, 46][this.level] + 6;
   }
 
-  override price(_m: Monarch): number {
+  override price(m: Monarch): number {
     if (this.building) return 0;
     if (this.destroyed) return WALL_TIERS[this.level].rebuild;
+    const horn = wallHornPrice(this, passengerKind(this.world, m));
+    if (horn) return horn;
     const next = this.level + 1;
     if (next >= WALL_TIERS.length) return 0;
     if (next > TC_CAPS[tcLevel(this)].wall) return 0;
@@ -64,7 +67,12 @@ export class Wall extends Structure implements WallLike {
     return WALL_TIERS[next].cost;
   }
 
-  override onPaid(_m: Monarch): void {
+  override onPaid(m: Monarch): void {
+    const hk = passengerKind(this.world, m);
+    if (!this.destroyed && wallHornPrice(this, hk)) {
+      applyHermitUpgrade(this.world, this, hk!, m);
+      return;
+    }
     if (this.destroyed) {
       this.rebuilding = true;
       this.startBuild(this.level, Math.max(4, WALL_TIERS[this.level].work * 0.6));
@@ -223,7 +231,9 @@ export class Tower extends Structure {
     return this.platform + 14;
   }
 
-  override price(_m: Monarch): number {
+  override price(m: Monarch): number {
+    const sp = towerSpecialPrice(this, passengerKind(this.world, m));
+    if (sp) return sp;
     if (this.building || this.special) return 0;
     const next = this.level + 1;
     if (next >= TOWER_TIERS.length) return 0;
@@ -233,7 +243,12 @@ export class Tower extends Structure {
     return TOWER_TIERS[next].cost;
   }
 
-  override onPaid(_m: Monarch): void {
+  override onPaid(m: Monarch): void {
+    const hk = passengerKind(this.world, m);
+    if (towerSpecialPrice(this, hk)) {
+      applyHermitUpgrade(this.world, this, hk!, m);
+      return;
+    }
     this.startBuild(this.level + 1, TOWER_TIERS[this.level + 1].work);
     this.world.jobs.add('build', this, 2, this.world.clock);
   }

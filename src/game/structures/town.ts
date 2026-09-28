@@ -127,8 +127,8 @@ export class TownCenter extends Structure {
   }
 }
 
-const SHOP_ITEM: Record<ShopKind, RackItem> = { bow: 'bow', hammer: 'hammer', scythe: 'scythe', shield: 'shield', bomb: 'bomb', pike: 'pike' };
-const SHOP_PRICE: Record<ShopKind, number> = { bow: PRICES.bow, hammer: PRICES.hammer, scythe: PRICES.scythe, shield: PRICES.shield, bomb: PRICES.bomb, pike: PRICES.pike };
+const SHOP_ITEM: Record<ShopKind, RackItem> = { bow: 'bow', hammer: 'hammer', scythe: 'scythe', shield: 'shield', bomb: 'bomb', pike: 'pike', sword: 'sword', bread: 'bread' };
+const SHOP_PRICE: Record<ShopKind, number> = { bow: PRICES.bow, hammer: PRICES.hammer, scythe: PRICES.scythe, shield: PRICES.shield, bomb: PRICES.bomb, pike: PRICES.pike, sword: PRICES.sword, bread: PRICES.bread };
 
 export class Shop extends Structure {
   readonly type = 'shop' as const;

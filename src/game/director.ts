@@ -69,7 +69,7 @@ export class Director {
   nightWave(): void {
     const w = this.w;
     const t = w.time;
-    if (this.mult <= 0) return;
+    if (this.mult <= 0 || w.caveCleared) return;
     if (t.isCalmNight) {
       w.banner('ТИХАЯ НОЧЬ', 'Жадность истощена Кровавой луной', 4);
       return;

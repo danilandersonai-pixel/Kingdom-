@@ -24,8 +24,8 @@ import type { Animal } from './animal';
 
 export type Role = 'vagrant' | 'villager' | 'archer' | 'builder' | 'farmer' | 'squire' | 'knight' | 'pikeman';
 
-const TOOL_ROLE: Record<string, Role> = { bow: 'archer', hammer: 'builder', scythe: 'farmer', shield: 'squire', pike: 'pikeman' };
-const ROLE_TOOL: Partial<Record<Role, RackItem>> = { archer: 'bow', builder: 'hammer', farmer: 'scythe', squire: 'shield', knight: 'shield', pikeman: 'pike' };
+const TOOL_ROLE: Record<string, Role> = { bow: 'archer', hammer: 'builder', scythe: 'farmer', shield: 'squire', pike: 'pikeman', sword: 'knight' };
+const ROLE_TOOL: Partial<Record<Role, RackItem>> = { archer: 'bow', builder: 'hammer', farmer: 'scythe', squire: 'shield', knight: 'sword', pikeman: 'pike' };
 
 export interface FieldSlot {
   x: number;
@@ -74,6 +74,13 @@ export class Person extends Entity {
   attackTarget = 0;
   /** Ранг в строю у стены (для расстановки). */
   rank = 0;
+  /** Идёт на борт лодки (id пристани). */
+  boarding = 0;
+  /** Бродягу позвал хлеб пекарни (id пекарни). */
+  lured = 0;
+  /** Командир сопровождает монарха к пещере. */
+  escort = 0;
+  aboard = false;
   private titheTimer = 0;
   private wanderTimer = 0;
   private hop = 0;
@@ -299,6 +306,17 @@ export class Person extends Entity {
     this.shootCd -= dt;
     this.meleeCd -= dt;
     this.wanderTimer -= dt;
+    // Команда лодки идёт на борт.
+    if (this.boarding) {
+      const dock = w.all<Structure>('structure').find((s) => s.id === this.boarding);
+      if (!dock) this.boarding = 0;
+      else {
+        if (Math.abs(dock.x - this.x) > 3) this.goTo(dock.x, true);
+        else this.aboard = true;
+        this.integrate(dt);
+        return;
+      }
+    }
 
     switch (this.role) {
       case 'vagrant':
@@ -360,6 +378,15 @@ export class Person extends Entity {
 
   private vagrantAI(): void {
     const w = this.world;
+    if (this.lured) {
+      const bakery = w.all<Structure>('structure').find((s) => s.id === this.lured) as (Structure & { feed(p: Person): boolean }) | undefined;
+      if (!bakery) this.lured = 0;
+      else {
+        this.goTo(bakery.x, false);
+        if (Math.abs(bakery.x - this.x) < 4 && !bakery.feed(this)) this.lured = 0;
+        return;
+      }
+    }
     const scared = this.greedNear(4 * M);
     // Монета, брошенная прямо на бродягу, — берёт даже в страхе.
     const coinRange = scared ? 4 : 5 * M;
@@ -459,15 +486,14 @@ export class Person extends Entity {
       if (s.type !== 'shop') continue;
       const shop = s as Shop;
       if (shop.available <= 0) continue;
-      if (shop.item === 'shield' && this.coins < 0) continue;
-      if (shop.item === 'bomb') continue;
+      if (shop.item === 'bomb' || shop.item === 'bread' || shop.item === 'sword') continue;
       const d = Math.abs(shop.x - this.x);
       if (d < bd) {
         bd = d;
         bestShop = shop;
       }
     }
-    const ground = w.nearest(w.all<DroppedTool>('item').filter((i) => i instanceof DroppedTool) as DroppedTool[], this.x, 40 * M, (t) => t.settled && !t.claimedBy && insideKingdom(w, t.x, -40));
+    const ground = w.nearest(w.all<DroppedTool>('item').filter((i) => i instanceof DroppedTool) as DroppedTool[], this.x, 40 * M, (t) => t.settled && !t.claimedBy && t.item !== 'sword' && insideKingdom(w, t.x, -40));
     if (ground && Math.abs(ground.x - this.x) < bd) {
       ground.claimedBy = this.id;
       this.toolTarget = { kind: 'ground', id: ground.id, item: ground.item };
@@ -515,8 +541,10 @@ export class Person extends Entity {
     this.toolTarget = null;
     if (!role) return;
     const keep = this.coins;
+    const side = this.side;
     this.setRole(role);
-    this.coins = role === 'squire' ? 0 : Math.max(0, keep - 1);
+    this.coins = role === 'squire' ? 0 : role === 'knight' ? keep : Math.max(0, keep - 1);
+    if (role === 'knight') this.side = side;
     if (role === 'squire') {
       const shieldShop = this.world.all<Shop>('structure').find((s) => s.type === 'shop' && s.kind === 'shield' && Math.abs(s.x - this.x) < 20);
       if (shieldShop && shieldShop.side) this.side = shieldShop.side as -1 | 1;
@@ -618,11 +646,12 @@ export class Person extends Entity {
   /** Встать у внешней стены своей стороны (изнутри). */
   private defendPosition(inside: number): void {
     const w = this.world;
-    const ow = outerWall(w, this.side);
-    const edge = ow ? ow.x : kingdomEdge(w, this.side);
-    const pos = edge - this.side * (inside + (this.rank % 6) * 5);
+    const side = w.hornCall && (this.role === 'archer' || this.isSoldier) ? w.hornCall : this.side;
+    const ow = outerWall(w, side);
+    const edge = ow ? ow.x : kingdomEdge(w, side);
+    const pos = edge - side * (inside + (this.rank % 6) * 5);
     if (Math.abs(this.x - pos) > 3) this.goTo(pos, !w.time.isDay || Math.abs(this.x - pos) > 60);
-    else if (this.arrived) this.facing = this.side;
+    else if (this.arrived) this.facing = side;
   }
 
   private findShootTarget(range: number, hunt: boolean): Entity | null {
@@ -717,6 +746,9 @@ export class Person extends Entity {
         }
       } else if (j.kind === 'operate') {
         (t as Structure & { operate?: (dt: number, p: Person) => void }).operate?.(dt, this);
+      } else if (j.kind === 'push') {
+        (t as Structure & { push?: (dt: number) => void }).push?.(dt);
+        this.x = t.x - Math.sign(t.x - this.x || 1) * 6;
       }
       return;
     }
@@ -822,6 +854,19 @@ export class Person extends Entity {
 
   private soldierAI(): void {
     const w = this.world;
+    // Оруженосец идёт за мечом в кузницу.
+    if (this.role === 'squire' && w.time.isDay) {
+      if (this.toolTarget) {
+        if (this.pursueTool()) return;
+      } else {
+        const forge = w.all<Shop>('structure').find((s) => s.type === 'shop' && s.kind === 'sword' && s.available > 0);
+        if (forge) {
+          forge.reserved++;
+          this.toolTarget = { kind: 'shop', id: forge.id, item: 'sword' };
+          return;
+        }
+      }
+    }
     // Пополнение брони: подбираем монеты, брошенные рядом.
     if (this.coins < this.maxCarry) {
       const c = w.nearest(w.all<Coin>('coin'), this.x, 3 * M, (e) => e.kind === 'coin' && e.y < 20 && (!e.claimedBy || e.claimedBy === this.id) && !e.homing);
@@ -865,6 +910,16 @@ export class Person extends Entity {
       this.action = 'act';
       this.actionTimer = 0.45;
       enemy.takeDamage(PEOPLE.knightDamage, this.x);
+    }
+    // Сопровождение монарха с бомбой к пещере.
+    if (this.escort) {
+      const m = w.all<Monarch>('monarch').find((e) => e.id === this.escort);
+      if (!m || w.caveCleared) this.escort = 0;
+      else {
+        const pos = m.x - m.facing * 20;
+        if (Math.abs(pos - this.x) > 6) this.goTo(pos, Math.abs(pos - this.x) > 40);
+        return;
+      }
     }
     // Приказ атаковать портал.
     if (this.attackTarget) {
@@ -957,6 +1012,7 @@ export class Person extends Entity {
   // ——— Отрисовка ———
 
   override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
+    if (this.aboard) return;
     let anim: HumanAnim = 'idle';
     if (this.action) anim = this.action;
     else if (this.moveSpeed > 0) anim = this.running ? 'run' : 'walk';
