@@ -1,7 +1,8 @@
 // Звук целиком синтезируется WebAudio: эффекты, фон (ветер, река, птицы,
-// сверчки, дождь) и генеративная музыка. Никаких аудиофайлов.
+// сверчки, дождь); генеративная музыка — в music.ts. Никаких аудиофайлов.
 
 import type { Sfx, SoundName } from './sfx';
+import { Music } from './music';
 
 type Ctx = AudioContext;
 
@@ -27,10 +28,9 @@ export class Audio implements Sfx {
   private wind: { gain: GainNode; filter: BiquadFilterNode } | null = null;
   private river: GainNode | null = null;
   private rain: GainNode | null = null;
-  private env = { night: 0, winter: false, rain: 0, blood: false, day: true, danger: 0 };
   private nextBird = 0;
   private nextCricket = 0;
-  private music = { next: 0, step: 0, bar: 0, chord: 0 };
+  private music: Music | null = null;
   muted = false;
 
   /** Запуск по первому жесту пользователя (требование браузеров). */
@@ -67,6 +67,7 @@ export class Audio implements Sfx {
     this.noise = ctx.createBuffer(1, len, ctx.sampleRate);
     const d = this.noise.getChannelData(0);
     for (let i = 0; i < len; i++) d[i] = Math.random() * 2 - 1;
+    this.music = new Music(ctx, this.musicBus);
     this.applySettings();
     this.startAmbient();
   }
@@ -386,7 +387,6 @@ export class Audio implements Sfx {
 
   /** Обновление фона раз в кадр. */
   update(dt: number, env: { night: number; winter: boolean; rain: number; blood: boolean; day: boolean; danger: number }): void {
-    this.env = env;
     if (!this.ctx || this.muted) return;
     const t = this.ctx.currentTime;
     if (this.wind) {
@@ -409,53 +409,7 @@ export class Audio implements Sfx {
         for (let i = 0; i < 3; i++) this.tone(4400 + Math.random() * 300, 0.03, 'sine', 0.012, { at: t + i * 0.06, bus: this.ambBus, pan: Math.random() * 2 - 1 });
       }
     }
-    this.updateMusic();
+    this.music?.update(env);
     void dt;
-  }
-
-  // ——— Генеративная музыка ———
-
-  private updateMusic(): void {
-    const ctx = this.ctx!;
-    const t = ctx.currentTime;
-    if (this.music.next === 0) this.music.next = t + 2;
-    const bpm = this.env.blood ? 56 : this.env.night > 0.5 ? 60 : 68;
-    const beat = 60 / bpm;
-    while (this.music.next < t + 0.4) {
-      this.scheduleBeat(this.music.next, beat);
-      this.music.next += beat / 2;
-    }
-  }
-
-  private scheduleBeat(at: number, beat: number): void {
-    const m = this.music;
-    const step = m.step++;
-    const env = this.env;
-    // Лады: день — дорийский ре, ночь — эолийский ля, Кровавая луна — фригийский.
-    const scales = env.blood ? [0, 1, 3, 5, 7, 8, 10] : env.night > 0.5 ? [0, 2, 3, 5, 7, 8, 10] : [0, 2, 3, 5, 7, 9, 10];
-    const root = env.blood ? 52 : env.night > 0.5 ? 57 : 50;
-    const chords = [0, 5, 3, 4];
-    if (step % 16 === 0) {
-      m.bar++;
-      m.chord = chords[m.bar % chords.length];
-      // Мягкий аккорд-пэд на такт.
-      const deg = m.chord;
-      for (const k of [0, 2, 4]) {
-        const note = root - 12 + scales[(deg + k) % 7] + (deg + k >= 7 ? 12 : 0);
-        const f = 440 * Math.pow(2, (note - 69) / 12);
-        this.tone(f, beat * 8, 'sine', env.blood ? 0.05 : 0.035, { at, attack: beat * 2, bus: this.musicBus });
-        this.tone(f * 1.003, beat * 8, 'sine', 0.02, { at, attack: beat * 2, bus: this.musicBus });
-      }
-    }
-    // Редкая мелодия щипковым «инструментом».
-    const density = env.blood ? 0.2 : env.night > 0.5 ? 0.22 : 0.35;
-    if (Math.random() < density && step % 2 === 0) {
-      const deg = m.chord + [0, 2, 4, 1, 3, 5][Math.floor(Math.random() * 6)];
-      const note = root + 12 + scales[deg % 7] + (deg >= 7 ? 12 : 0);
-      const f = 440 * Math.pow(2, (note - 69) / 12);
-      this.tone(f, beat * 2.5, 'triangle', 0.045, { at, bus: this.musicBus, echo: true, attack: 0.004 });
-    }
-    // Кровавая луна: глухой «барабан».
-    if (env.blood && step % 4 === 0) this.tone(55, 0.4, 'sine', 0.12, { at, slide: 35, bus: this.musicBus });
   }
 }
