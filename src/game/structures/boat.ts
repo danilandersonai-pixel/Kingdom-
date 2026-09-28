@@ -3,10 +3,12 @@
 // и маяка (без маяка лодка разбивается).
 
 import { Structure } from './structure';
+import { Entity } from '../entity';
 import type { Monarch } from '../entities/monarch';
 import type { Renderer } from '../../render/renderer';
 import type { Light } from '../../render/lighting';
-import { blit, hex } from '../../engine/sprite';
+import { blit, flipOf, hex } from '../../engine/sprite';
+import { fxRng } from '../../engine/rng';
 import { boatSprite, dockSprite, lighthouseSprite } from '../../art/buildings';
 import { PRICES, BOAT_PARTS, WORK, M, ISLANDS } from '../config';
 import type { Person } from '../entities/person';
@@ -236,5 +238,81 @@ export class FarDock extends Structure {
 
   override serialize(): Record<string, unknown> {
     return { ...super.serialize(), hasLighthouse: this.hasLighthouse };
+  }
+}
+
+/**
+ * Лодка, на которой приплыл монарх, — у дальнего причала. Без маяка она,
+ * отстояв своё, разбивается о камни: трещит, кренится и уходит под воду, по
+ * волнам плывут доски (обломки потом чинят у центральной пристани). С маяком —
+ * стоит на воде, пока монарх не уедет. В сохранение не попадает.
+ */
+export class ArrivalBoat extends Entity {
+  readonly tag = 'fx' as const;
+  /** Когда (с после прибытия) лодка разбивается: уже после таблички острова. */
+  static readonly CRASH_AT = 10;
+  private t = 0;
+  private sink = 0;
+
+  constructor(x: number, readonly wrecks: boolean, readonly side: -1 | 1) {
+    super();
+    this.x = x;
+    this.z = 4;
+  }
+
+  get drawRadius(): number {
+    return 60;
+  }
+
+  override update(dt: number): void {
+    const w = this.world;
+    const before = this.t;
+    this.t += dt;
+    if (!this.wrecks) {
+      // С маяком лодка просто ждёт; монарх уехал — её уже не видно.
+      const near = w.all<Monarch>('monarch').some((m) => Math.abs(m.x - this.x) < 320);
+      if (this.t > 10 && !near) this.dead = true;
+      return;
+    }
+    const at = ArrivalBoat.CRASH_AT;
+    if (before < at && this.t >= at) {
+      w.sound('wallBreak', this.x, 0.9);
+      w.sound('splash', this.x, 1);
+      w.fx.shake(1.2);
+      w.fx.ripple(this.x, 16);
+      w.fx.particles.burst(this.x, -10, 16, { color: '#e8f0f4', speed: 42, spread: 1.3, up: 18, gravity: 90, life: 0.7 });
+    }
+    if (this.t >= at) {
+      this.sink = Math.min(1, (this.t - at) / 2.4);
+      // Доски и щепки всплывают и дрейфуют по воде.
+      if (this.sink < 0.9 && fxRng.chance(dt * 6)) {
+        w.fx.particles.spawn({ x: this.x + fxRng.range(-26, 26), y: -11, vx: this.side * fxRng.range(4, 12), vy: 0, life: 3.5, max: 3.5, size: fxRng.chance(0.5) ? 2 : 1, color: fxRng.chance(0.5) ? '#6a4c32' : '#8a6a44', drag: 0.4 });
+      }
+      if (this.t - dt < at + 1.2 && this.t >= at + 1.2) w.fx.ripple(this.x - this.side * 10, 10);
+      if (this.sink >= 1 && this.t > at + 3) {
+        this.dead = true;
+        w.banner('ЛОДКА РАЗБИЛАСЬ', 'Без маяка лодке не уцелеть у чужого берега', 5);
+      }
+    }
+  }
+
+  override draw(ctx: CanvasRenderingContext2D, r: Renderer): void {
+    const s = boatSprite(3);
+    // Нос смотрит на берег.
+    const img = this.side > 0 ? flipOf(s).img : s.img;
+    const sx = r.sx(this.x);
+    const gy = r.sy(0);
+    const bob = Math.sin(this.t * 1.4) * (1 - this.sink);
+    const dy = Math.round(13 + bob + this.sink * this.sink * 44);
+    // Корма тонет первой: нос задирается.
+    const ang = this.sink * 0.3 * this.side;
+    ctx.save();
+    ctx.beginPath();
+    ctx.rect(sx - 70, gy - 130, 140, 141);
+    ctx.clip();
+    ctx.translate(sx, gy + dy);
+    if (ang) ctx.rotate(ang);
+    ctx.drawImage(img, -s.ax, -s.h);
+    ctx.restore();
   }
 }

@@ -81,11 +81,13 @@ export class Critter extends Entity {
     if (this.fleeing > 0) {
       this.fleeing -= dt;
       if (this.kind === 'butterfly') {
-        // Бабочка не взмывает в кроны, а отпархивает в сторону низко над травой.
+        // Бабочка не взмывает в кроны, а отпархивает в сторону низко над травой;
+        // от дождя — ныряет в траву и прячется.
         this.state = 'fly';
         this.x += this.facing * 18 * dt;
-        this.y = Math.min(16, this.y + Math.sin(this.anim * 9) * 12 * dt + 4 * dt);
-        if (this.fleeing <= 0) this.dead = true;
+        if (w.weatherWet) this.y = Math.max(0, this.y - 7 * dt + Math.sin(this.anim * 9) * 6 * dt);
+        else this.y = Math.min(16, this.y + Math.sin(this.anim * 9) * 12 * dt + 4 * dt);
+        if (this.fleeing <= 0 || (w.weatherWet && this.y <= 0.5)) this.dead = true;
       } else if (this.flier) {
         // Взлёт и прочь: вверх и в сторону от всадника.
         this.state = 'fly';
@@ -310,7 +312,10 @@ export function installCritters(w: World): void {
             break;
           case 'butterfly':
             // В дождь бабочки прячутся — отпархивают и исчезают.
-            if (w.weatherWet && !c.fleeing) c.startFlee(fxRng.chance(0.5) ? 1 : -1);
+            if (w.weatherWet && !c.fleeing) {
+              c.startFlee(fxRng.chance(0.5) ? 1 : -1);
+              c.fleeing = 1.8;
+            }
             else if (!near(c.x)) c.dead = true;
             break;
           case 'owl':

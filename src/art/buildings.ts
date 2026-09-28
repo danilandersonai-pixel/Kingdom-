@@ -563,7 +563,13 @@ export function boatSprite(stage: number): Sprite {
     if (stage >= 3) {
       poly(ctx, [[w / 2 + 2, 8], [w / 2 + 22, 16], [w / 2 + 20, 38], [w / 2 + 2, 42]], '#e8e0cc');
       poly(ctx, [[w / 2 - 2, 10], [w / 2 - 18, 18], [w / 2 - 16, 36], [w / 2 - 2, 40]], '#d8d0bc');
-      rect(ctx, w / 2 + 6, 22, 8, 6, '#a82a2a');
+      // Герб на парусе: золотая корона на алом поле.
+      rect(ctx, w / 2 + 5, 21, 9, 8, '#a82a2a');
+      rect(ctx, w / 2 + 5, 28, 9, 1, '#7a1a1a');
+      const cx = w / 2 + 9;
+      for (const dx of [-2, 0, 2]) px(ctx, cx + dx, 23, '#f2c84a');
+      rect(ctx, cx - 2, 24, 5, 1, '#f2c84a');
+      rect(ctx, cx - 2, 25, 5, 1, '#c89a2a');
       rect(ctx, w / 2 - 1, 2, 7, 4, '#a82a2a');
     }
   });

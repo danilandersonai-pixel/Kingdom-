@@ -63,6 +63,8 @@ export class App {
   private menu!: Menu;
   private sail: { dock: CentralDock; dest: number; from: number; t: number; monarch: Monarch } | null = null;
   private voyage = new Voyage();
+  /** Объявление прибытия (табличка, число дня) — после сцены плавания. */
+  private pendingArrival: (() => void) | null = null;
   /** Небо покинутого острова: на нём идёт вся сцена плавания, без скачка облаков. */
   private voyageBg: Renderer['bg'] | null = null;
   private chooseIndex = 2;
@@ -172,7 +174,6 @@ export class App {
     r.particles.list.length = 0;
     this.cameras[0].snap(monarchs[0].x);
     if (monarchs[1]) this.cameras[1].snap(monarchs[1].x);
-    this.hud.showDay(world.time.day);
     // При возвращении на остров мир тот же — подписываемся только один раз.
     if (!this.hooked.has(world)) {
       this.hooked.add(world);
@@ -210,8 +211,14 @@ export class App {
       world.on('sail', (m: Monarch, dock: CentralDock) => this.openChoose(m, dock));
     }
     // Первое прибытие на новый остров — памятный момент, иначе — просто надпись.
-    if (world.island.index > 1 && !this.campaign.meta.moments.includes(`isl${world.island.index}`) && this.state !== 'title') this.moment(`isl${world.island.index}`, `ОСТРОВ ${toRoman(world.island.index)}`, 'Новая земля');
-    else world.banner(`ОСТРОВ ${toRoman(world.island.index)}`, undefined, 4);
+    const announce = () => {
+      this.hud.showDay(world.time.day);
+      if (world.island.index > 1 && !this.campaign.meta.moments.includes(`isl${world.island.index}`) && this.state !== 'title') this.moment(`isl${world.island.index}`, `ОСТРОВ ${toRoman(world.island.index)}`, 'Новая земля');
+      else world.banner(`ОСТРОВ ${toRoman(world.island.index)}`, undefined, 4);
+    };
+    // В плавании объявление ждёт, пока новый остров проявится из-за моря.
+    if (this.state === 'sailing') this.pendingArrival = announce;
+    else announce();
   }
 
   /** Памятный момент: табличка с салютом и фанфары. Ключ — для разовых (пустой — всегда). */
@@ -525,6 +532,11 @@ export class App {
           this.enterWorld(a.world, a.monarchs);
         }
         if (s.t > 2.6) this.stepWorld(dt, false);
+        if (s.t >= vEnd && this.pendingArrival) {
+          const announce = this.pendingArrival;
+          this.pendingArrival = null;
+          announce();
+        }
         if (s.t > vEnd + 1) {
           this.sail = null;
           this.voyageBg = null;

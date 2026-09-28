@@ -10,7 +10,8 @@ import { Person } from './entities/person';
 import { Dog, Ghost } from './entities/npc';
 import type { Structure } from './structures/structure';
 import type { Portal } from './structures/portal';
-import type { CentralDock, FarDock } from './structures/boat';
+import { ArrivalBoat, type CentralDock, type FarDock } from './structures/boat';
+import type { Entity } from './entity';
 import type { Wall } from './structures/defense';
 import type { Hermit } from './structures/hermits';
 import { M, ISLANDS } from './config';
@@ -167,6 +168,11 @@ export class Campaign {
         cdock.building = false;
         w.jobs.removeFor(cdock);
       }
+    }
+    // Лодка, на которой приплыли, — у дальнего причала (без маяка разобьётся).
+    if (far) {
+      for (const b of w.all<Entity>('fx')) if (b instanceof ArrivalBoat) b.dead = true;
+      w.addNow(new ArrivalBoat(far.x + w.island.beachSide * M, !far.hasLighthouse, w.island.beachSide));
     }
     monarchs.forEach((m, i) => {
       m.x = arriveX - w.island.beachSide * i * 20;

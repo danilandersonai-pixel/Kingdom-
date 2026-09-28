@@ -151,6 +151,8 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
   const pw = W - px * 2;
   const iy = Math.round(H * 0.25);
   const bob = Math.floor(performance.now() / 350) % 2 === 0;
+  // Тёмная подложка под рядом островов: номера и силуэты читаются и на облаках.
+  drawPanel(ctx, px - 10, iy - 22, pw + 20, 41, 0.5);
   for (let i = 1; i <= 5; i++) {
     const x = Math.round(px + (pw * (i - 0.5)) / 5);
     const visited = i <= c.reached;
