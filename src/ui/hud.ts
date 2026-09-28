@@ -105,11 +105,12 @@ export class Hud {
     const a = this.purseAlpha;
     const bag = pouchSprites();
     const cx = Math.floor(r.w / 2);
-    // Кошелёк выезжает сверху и уезжает обратно — без полупрозрачной серости.
-    const ease = 1 - Math.pow(1 - a, 3);
+    // Кошелёк выезжает сверху и уезжает обратно целиком, не тая: нижняя треть
+    // хода уходит на то, чтобы он скрылся за краем, — бледной «шапки» у края нет.
+    const p = Math.max(0, (a - 0.3) / 0.7);
+    if (p <= 0) return;
+    const ease = 1 - Math.pow(1 - p, 3);
     const top = 3 - Math.round((1 - ease) * (bag.back.h + 8));
-    // В начале выезда — ещё и проявляется, чтобы у края не торчал обрубок мешка.
-    ctx.globalAlpha = Math.min(1, a * 2.2);
     blit(ctx, bag.back, cx, top);
     // Монеты насыпаны горкой внутри: нижний ряд уходит за передний край,
     // по бокам горка приподнята — дно у мешка круглое.
@@ -137,7 +138,6 @@ export class Hud {
       blit(ctx, frames[i % frames.length], cx - 9 + (i % 5) * 4 + (row % 2) * 2 + Math.round(jx * 0.4), base - 10 - row * 2);
     }
     blit(ctx, bag.front, cx, top);
-    ctx.globalAlpha = 1;
   }
 
   private drawDay(ctx: CanvasRenderingContext2D, r: Renderer, blood = false): void {

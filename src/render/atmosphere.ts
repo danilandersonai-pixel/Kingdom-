@@ -53,6 +53,8 @@ export interface Atmosphere {
   moonX: number;
   /** Насколько светила видны сквозь тучи (0..1). */
   clear: number;
+  /** Номер дня: у каждого дня свой рисунок облаков. */
+  day: number;
 }
 
 interface Key {
@@ -80,8 +82,8 @@ const KEYS: Array<[number, Key]> = [
   [0.06, { top: '#4e6a9c', mid: '#a4a0b4', hor: '#f3d0a6', far: '#9eaab4', near: '#2c3a36', nearLight: '#7f8a6a', nearShade: '#1a2422', cloud: '#c9c0c8', cloudLight: '#fbe6cc', overlay: '#403040', overlayAlpha: 0.08, glow: 0.1, stars: 0, fog: '#f0dcc8', fogAlpha: 0.22, water: '#34506a' }],
   [0.14, { top: '#5a86bd', mid: '#90b5d6', hor: '#d9e7e6', far: '#9db8c2', near: '#2a3f35', nearLight: '#5d7a4f', nearShade: '#18261f', cloud: '#dfe8ee', cloudLight: '#ffffff', overlay: '#000000', overlayAlpha: 0, glow: 0, stars: 0, fog: '#dbe8ea', fogAlpha: 0.1, water: '#3a6a80' }],
   [0.45, { top: '#5a86bd', mid: '#90b5d6', hor: '#dde8e2', far: '#a0b9c0', near: '#2a3f35', nearLight: '#5d7a4f', nearShade: '#18261f', cloud: '#dfe8ee', cloudLight: '#ffffff', overlay: '#000000', overlayAlpha: 0, glow: 0, stars: 0, fog: '#dbe8ea', fogAlpha: 0.08, water: '#3a6a80' }],
-  [0.56, { top: '#4c6aa0', mid: '#b09aa8', hor: '#f4bf86', far: '#a39aa6', near: '#2d3033', nearLight: '#8a6a4a', nearShade: '#1c1c22', cloud: '#c8a8b0', cloudLight: '#ffd7a0', overlay: '#402818', overlayAlpha: 0.1, glow: 0.1, stars: 0, fog: '#f2c8a0', fogAlpha: 0.2, water: '#3a4a64' }],
-  [0.62, { top: '#2e2d5c', mid: '#9a5a78', hor: '#f08a5c', far: '#7a5a78', near: '#241c2c', nearLight: '#8a4a4a', nearShade: '#160f1c', cloud: '#8a5a78', cloudLight: '#ffa070', overlay: '#3a1a38', overlayAlpha: 0.32, glow: 0.55, stars: 0.1, fog: '#d8806a', fogAlpha: 0.25, water: '#2a2446' }],
+  [0.56, { top: '#4c6aa0', mid: '#b09aa8', hor: '#f4bf86', far: '#a39aa6', near: '#2d3033', nearLight: '#8a6a4a', nearShade: '#1c1c22', cloud: '#c8a8b0', cloudLight: '#ffd7a0', overlay: '#402818', overlayAlpha: 0.14, glow: 0.1, stars: 0, fog: '#f2c8a0', fogAlpha: 0.2, water: '#3a4a64' }],
+  [0.62, { top: '#2e2d5c', mid: '#9a5a78', hor: '#f08a5c', far: '#7a5a78', near: '#241c2c', nearLight: '#8a4a4a', nearShade: '#160f1c', cloud: '#8a5a78', cloudLight: '#ffa070', overlay: '#3a1a38', overlayAlpha: 0.44, glow: 0.55, stars: 0.1, fog: '#d8806a', fogAlpha: 0.25, water: '#2a2446' }],
   [0.68, { top: '#0c1230', mid: '#1c2448', hor: '#34385e', far: '#28304e', near: '#0d1222', nearLight: '#2a3350', nearShade: '#080b16', cloud: '#262c4a', cloudLight: '#48507a', overlay: '#070b1e', overlayAlpha: 0.66, glow: 1, stars: 0.8, fog: '#2c3658', fogAlpha: 0.2, water: '#0d1428' }],
   [0.83, { top: '#070b1d', mid: '#101a36', hor: '#1f2d4f', far: '#1f2b47', near: '#0a0f1c', nearLight: '#24304e', nearShade: '#060913', cloud: '#1c2440', cloudLight: '#3a4670', overlay: '#050818', overlayAlpha: 0.72, glow: 1, stars: 1, fog: '#24304e', fogAlpha: 0.22, water: '#0a1024' }],
   [0.95, { top: '#0e1330', mid: '#252a50', hor: '#4a4266', far: '#2e3050', near: '#0e1020', nearLight: '#303652', nearShade: '#080a14', cloud: '#2c2e50', cloudLight: '#5a5070', overlay: '#0a0c20', overlayAlpha: 0.62, glow: 0.95, stars: 0.7, fog: '#3a3a5a', fogAlpha: 0.3, water: '#10142c' }],
@@ -261,6 +263,7 @@ export function computeAtmosphere(inp: AtmosphereInput): Atmosphere {
     sunX: 0.27,
     moonX: 0.72,
     clear: 1 - oc * 0.92,
+    day: inp.day ?? 0,
   };
 }
 

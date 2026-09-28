@@ -252,6 +252,8 @@ interface Cloud {
   item: AtlasItem;
   /** 0 — дальний слой (меньше, бледнее, медленнее), 1 — ближний. */
   layer: number;
+  /** Облако видно, когда облачность дня выше ранга. */
+  rank: number;
 }
 
 interface Star {
@@ -346,6 +348,13 @@ export class Background {
   private cloudColoredCtx!: CanvasRenderingContext2D;
   private cloudScratch!: [HTMLCanvasElement, CanvasRenderingContext2D];
   private cloudTone = '';
+  private seed: number;
+  /** Текущая облачность (плавно тянется к облачности дня); −1 — ещё не задана. */
+  private cover = -1;
+  /** Сдвиг рисунка облаков: задаётся по дню один раз, дальше облака только плывут. */
+  private cloudShift = -1;
+  /** Буфер для слоя леса, который тает у берега. */
+  private shoreBuf: [HTMLCanvasElement, CanvasRenderingContext2D] | null = null;
   private season: Season;
   private recolorTimer = 0;
   private recolorNext = 0;
@@ -358,6 +367,7 @@ export class Background {
 
   constructor(seed: number, season: Season) {
     this.season = season;
+    this.seed = seed;
     for (let i = 0; i < LAYERS.length; i++) this.layers.push(new Layer(LAYERS[i], i, seed, season));
     const rng = new Rng(seed ^ 0xabcdef);
     for (let i = 0; i < 190; i++) {
@@ -479,7 +489,7 @@ export class Background {
     for (let i = 0; i < 14; i++) {
       const layer = i < 6 ? 0 : 1;
       const item = items[layer === 0 ? rng.int(0, items.length - 1) : rng.int(0, 7)];
-      this.clouds.push({ x: rng.range(0, 2600), y: layer === 0 ? rng.range(0.12, 0.62) : rng.range(0.04, 0.46), speed: rng.range(1.5, 5) * (layer ? 1 : 0.55), item, layer });
+      this.clouds.push({ x: rng.range(0, 2600), y: layer === 0 ? rng.range(0.12, 0.62) : rng.range(0.04, 0.46), speed: rng.range(1.5, 5) * (layer ? 1 : 0.55), item, layer, rank: rng.next() });
     }
     this.clouds.sort((a, b) => a.layer - b.layer);
   }
@@ -626,15 +636,23 @@ export class Background {
     }
     ctx.globalAlpha = 1;
 
-    // Облака: дальний слой бледнее и медленнее.
+    // Облака: дальний слой бледнее и медленнее. У каждого дня свой рисунок
+    // неба и своя облачность — ясно, облачно или пасмурно (в дождь — сплошь);
+    // на смене дня облака плавно проявляются и тают.
     this.recolorClouds(a);
+    const u = hash2(a.day, this.seed & 0xffff);
+    const target = Math.max(u < 0.25 ? 0.3 : u < 0.8 ? 0.62 : 1, (1 - a.clear) * 1.2);
+    this.cover = this.cover < 0 ? target : this.cover + (target - this.cover) * Math.min(1, dt * 0.08);
+    if (this.cloudShift < 0) this.cloudShift = (a.day * 977) % 2600;
     const cw = w + 300;
     for (const c of this.clouds) {
+      const vis = Math.min(1, (this.cover - c.rank) * 8);
+      if (vis <= 0) continue;
       const par = c.layer ? 0.05 : 0.025;
-      const x = ((((c.x - camX * par) % 2600) + 2600) % 2600) - 180;
+      const x = ((((c.x + this.cloudShift - camX * par) % 2600) + 2600) % 2600) - 180;
       if (x > cw) continue;
       const it = c.item;
-      if (!c.layer) ctx.globalAlpha = 0.72;
+      ctx.globalAlpha = (c.layer ? 1 : 0.72) * vis;
       const y = Math.round(c.y * horizonY * (c.layer ? 0.7 : 0.8));
       ctx.drawImage(this.cloudColored, it.x, this.cloudColored.height - it.h, it.w, it.h, Math.round(x), y, it.w, it.h);
       ctx.globalAlpha = 1;
@@ -779,20 +797,31 @@ export class Background {
       this.layers[i].recolor(a.layers[i], a.evergreen[i]);
       this.recolorTimer = 0.2 / this.layers.length;
     }
-    let clipped = false;
     for (let i = 0; i < this.layers.length; i++) {
       // За краем острова ближний лес кончается: дальний берег, а перед ним — море.
-      if (shore && i === 2) {
-        this.drawSea(ctx, a, shore, w, groundY);
-        ctx.save();
-        ctx.beginPath();
-        if (shore.side > 0) ctx.rect(0, 0, Math.max(0, Math.round(shore.sx)), groundY + 24);
-        else ctx.rect(Math.round(shore.sx), 0, w - Math.round(shore.sx), groundY + 24);
-        ctx.clip();
-        clipped = true;
-      }
+      if (shore && i === 2) this.drawSea(ctx, a, shore, w, groundY);
       const tone = a.layers[i];
-      this.layers[i].draw(ctx, camX, w, groundY, tone);
+      if (shore && i >= 2) {
+        // Лес у берега тает к морю, а не обрывается по линейке; дальние слои
+        // заходят чуть дальше — берег уходит вдаль ступенями.
+        const cv = ctx.canvas;
+        if (!this.shoreBuf || this.shoreBuf[0].width !== cv.width || this.shoreBuf[0].height !== cv.height) this.shoreBuf = makeCanvas(cv.width, cv.height);
+        const [buf, bc] = this.shoreBuf;
+        bc.globalCompositeOperation = 'source-over';
+        bc.clearRect(0, 0, buf.width, buf.height);
+        this.layers[i].draw(bc, camX, w, groundY, tone);
+        const edge = shore.sx + shore.side * (4 - i) * 14;
+        const g = bc.createLinearGradient(edge - shore.side * 34, 0, edge, 0);
+        g.addColorStop(0, 'rgba(0,0,0,1)');
+        g.addColorStop(1, 'rgba(0,0,0,0)');
+        bc.globalCompositeOperation = 'destination-in';
+        bc.fillStyle = g;
+        bc.fillRect(0, 0, buf.width, buf.height);
+        bc.globalCompositeOperation = 'source-over';
+        ctx.drawImage(buf, 0, 0);
+      } else {
+        this.layers[i].draw(ctx, camX, w, groundY, tone);
+      }
       // Дымка у земли после дальних слоёв.
       if (i >= 1 && i <= 3 && a.fogAlpha > 0.01) {
         const top = groundY - 60 + i * 8;
@@ -806,17 +835,18 @@ export class Background {
     }
     void LAYER_COUNT;
     void fxRng;
-    if (clipped) ctx.restore();
-    // Морская дымка на стыке: лес у берега тает в воздухе над водой, без шва.
+    // Морская дымка на стыке: гуще всего над кромкой берега и плавно гаснет
+    // в обе стороны — над лесом и над морем, без резкого края.
     if (shore) {
       const sx = Math.round(shore.sx);
-      const wd = 44;
-      const x0 = shore.side > 0 ? sx - wd : sx;
+      const wd = 88;
+      const x0 = sx - wd / 2;
       if (x0 < w && x0 + wd > 0) {
         const mist = mix(mix(a.waterDeep, a.skyHorizon, 0.55), a.fogColor, 0.3);
         const g = ctx.createLinearGradient(x0, 0, x0 + wd, 0);
-        g.addColorStop(shore.side > 0 ? 0 : 1, rgb(mist, 0));
-        g.addColorStop(shore.side > 0 ? 1 : 0, rgb(mist, 1));
+        g.addColorStop(0, rgb(mist, 0));
+        g.addColorStop(0.5 + shore.side * 0.08, rgb(mist, 1));
+        g.addColorStop(1, rgb(mist, 0));
         ctx.fillStyle = g;
         // Сверху дымка реже — полосами с растущей плотностью к земле.
         const top = groundY - 150;

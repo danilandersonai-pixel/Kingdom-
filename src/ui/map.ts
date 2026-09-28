@@ -150,7 +150,7 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
   const px = Math.round(W * 0.08);
   const pw = W - px * 2;
   const iy = Math.round(H * 0.25);
-  const blink = Math.floor(performance.now() / 400) % 2 === 0;
+  const bob = Math.floor(performance.now() / 350) % 2 === 0;
   for (let i = 1; i <= 5; i++) {
     const x = Math.round(px + (pw * (i - 0.5)) / 5);
     const visited = i <= c.reached;
@@ -164,7 +164,10 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
     drawText(ctx, toRoman(i), x, iy + 6, { align: 'center', color: sel ? '#fff4d8' : cur ? '#f2c84a' : visited || reachable ? '#d8ccb0' : '#8a8a9a' });
     if (sel) {
       rect(ctx, x - rw / 2 - 4, iy + 14, rw + 8, 1, '#f2c84a');
-      if (blink) drawText(ctx, 'v', x, iy - 22, { align: 'center', color: '#f2c84a' });
+      // Указатель — закрашенный треугольник (буква «v» читалась как римская V).
+      const ty = iy - (visited ? 25 : 31) + (bob ? 1 : 0);
+      for (let k = 0; k < 5; k++) rect(ctx, x - 4 + k, ty - 1 + k, 9 - k * 2, 1, '#3a2a0c');
+      for (let k = 0; k < 4; k++) rect(ctx, x - 3 + k, ty + k, 7 - k * 2, 1, k === 0 ? '#fff0a0' : '#f2c84a');
     }
     if (cur) {
       // Флаг над островом, где сейчас монарх.

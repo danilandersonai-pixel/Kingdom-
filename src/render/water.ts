@@ -9,6 +9,8 @@ export interface Ripple {
   x: number;
   r: number;
   life: number;
+  /** Строка воды, куда упала капля (иначе — по хэшу от x у берега). */
+  y?: number;
 }
 
 export function drawWater(
@@ -164,15 +166,15 @@ export function drawWater(
     if (sx < -20 || sx > w + 20) continue;
     const t = 1 - rp.life;
     const rad = 1 + t * rp.r;
-    ctx.fillStyle = rgb(glint, 0.45 * rp.life);
-    const y = waterTop + 2 + Math.floor(hash2(Math.floor(rp.x), 1) * Math.min(20, waterH - 4));
+    ctx.fillStyle = rgb(glint, 0.75 * rp.life);
+    const y = rp.y !== undefined ? Math.min(h - 3, Math.round(rp.y)) : waterTop + 2 + Math.floor(hash2(Math.floor(rp.x), 1) * Math.min(20, waterH - 4));
     // Круг сбоку — сплюснутое кольцо: верхняя дуга, концы и слабая нижняя.
     const rw = Math.max(1, Math.round(rad * 2));
     ctx.fillRect(Math.round(sx - rad) + 1, y, Math.max(1, rw - 2), 1);
     if (rad > 1.5) {
       ctx.fillRect(Math.round(sx - rad), y + 1, 1, 1);
       ctx.fillRect(Math.round(sx + rad) - 1, y + 1, 1, 1);
-      ctx.fillStyle = rgb(glint, 0.2 * rp.life);
+      ctx.fillStyle = rgb(glint, 0.3 * rp.life);
       ctx.fillRect(Math.round(sx - rad) + 1, y + 2, Math.max(1, rw - 2), 1);
     }
   }
