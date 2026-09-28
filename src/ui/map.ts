@@ -168,9 +168,28 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
     }
   }
 
-  // ——— Схема текущего острова на доске ———
+  // ——— Схема острова на доске: текущего, а при выборе пути — выбранного ———
   const sy = Math.round(H * 0.6);
   drawPanel(ctx, px - 10, sy - 22, pw + 20, 76, 0.7);
+  const shownIndex = selected ?? c.current;
+  const known = shownIndex === c.current ? w : c.islands.get(shownIndex)?.world ?? null;
+  if (!known) {
+    // Неизведанный остров: туман вместо схемы.
+    for (let x = px; x < px + pw; x += 3) {
+      const h = 2 + Math.round((Math.sin(x * 0.07) + Math.sin(x * 0.19 + 1)) * 1.5 + 2);
+      rect(ctx, x, sy - h, 3, h, '#3a3e50');
+    }
+    rect(ctx, px, sy, pw, 3, '#40465a');
+    rect(ctx, px - 4, sy + 5, pw + 8, 3, '#2a3048');
+    drawText(ctx, 'НЕИЗВЕДАННАЯ ЗЕМЛЯ', Math.round(W / 2), sy + 16, { align: 'center', color: '#c8bca0' });
+    drawText(ctx, `ОСТРОВ ${toRoman(shownIndex)}`, Math.round(W / 2), sy + 30, { align: 'center', color: '#e8dcc0' });
+    drawText(ctx, 'Сюда ещё не ступал ни один монарх.', Math.round(W / 2), sy + 41, { align: 'center', color: '#b0a488' });
+    return;
+  }
+  drawIslandScheme(ctx, W, px, pw, sy, known, known === w ? monarchX : [], c, shownIndex);
+}
+
+function drawIslandScheme(ctx: Ctx, W: number, px: number, pw: number, sy: number, w: World, monarchX: number[], c: Campaign, index: number): void {
   const L = w.island.left;
   const R = w.island.right;
   const toX = (x: number) => Math.round(px + ((x - L) / (R - L)) * pw);
@@ -257,6 +276,6 @@ export function drawMap(ctx: Ctx, W: number, H: number, w: World, c: Campaign, m
     lx += 10 + textWidth(t) + gap;
   }
   const t = w.time;
-  drawText(ctx, `ОСТРОВ ${toRoman(w.island.index)}   ДЕНЬ ${toRoman(t.day)}   ${SEASON_NAMES[t.season].toUpperCase()}`, Math.round(W / 2), sy + 30, { align: 'center', color: '#e8dcc0' });
+  drawText(ctx, `ОСТРОВ ${toRoman(index)}   ДЕНЬ ${toRoman(t.day)}   ${SEASON_NAMES[t.season].toUpperCase()}`, Math.round(W / 2), sy + 30, { align: 'center', color: '#e8dcc0' });
   drawText(ctx, `ПРАВЛЕНИЕ ${toRoman(c.reign)}   ВЗОРВАНО ПЕЩЕР: ${c.caves.size} ИЗ 5 (ПО ОДНОЙ НА ОСТРОВ)`, Math.round(W / 2), sy + 41, { align: 'center', color: '#b0a488' });
 }

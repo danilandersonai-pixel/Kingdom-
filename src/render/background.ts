@@ -418,7 +418,8 @@ export class Background {
       const tone = new Uint8Array(w * h);
       const zb = new Float32Array(w * h).fill(-1);
       // Низ почти ровный, но концы облака приподняты и скруглены.
-      const base = (x: number) => h - 1 - (stratus ? 0 : Math.round(3 * Math.pow(Math.abs((x + 0.5) / w - 0.5) * 2, 3)));
+      // Низ почти ровный, но с мягкими ступеньками — не «по линейке».
+      const base = (x: number) => h - 1 - (stratus ? 0 : Math.round(3 * Math.pow(Math.abs((x + 0.5) / w - 0.5) * 2, 3)) + (hash2(x >> 3, i * 13 + 5) > 0.55 ? 1 : 0));
       for (let y = 0; y < h; y++) {
         for (let x = 0; x < w; x++) {
           if (y > base(x)) continue;

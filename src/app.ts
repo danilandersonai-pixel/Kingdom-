@@ -559,7 +559,8 @@ export class App {
     w.listenerW = this.screen.w;
     w.update(dt);
     if (this.reroll && Math.abs(focus.x - this.reroll.x) > 6) this.reroll = null;
-    this.cameras[0].follow(focus, dt, this.screen.w, w.island.left, w.island.right);
+    // На титуле всадник-бот держится левее, чтобы его не закрывала доска меню.
+    this.cameras[0].follow(focus, dt, this.screen.w, w.island.left, w.island.right, this.state === 'title' || this.state === 'help' ? this.screen.w * 0.3 : 0);
     if (this.monarchs[1]) this.cameras[1].follow(this.monarchs[1], dt, this.screen.w, w.island.left, w.island.right);
     this.renderer.setSeason(w.time.season);
     this.updateWeather(dt);
@@ -620,7 +621,8 @@ export class App {
       phase: eclipse ? 0.8 : t.phase,
       season: t.season,
       blood: t.isBloodMoon ? 1 : 0,
-      overcast: this.renderer.weather.kind === 'rain' ? this.renderer.weather.intensity : 0,
+      // Тучи сгущаются раньше, чем разойдётся дождь: при первых каплях солнца уже не видно.
+      overcast: this.renderer.weather.kind === 'rain' ? Math.min(1, this.renderer.weather.intensity * 1.7) : 0,
       snow: t.season === 'winter' ? 1 : 0,
       day: t.day,
     });
@@ -645,7 +647,7 @@ export class App {
         if (showLabels) w.drawLabels(ctx, r);
         if (showHud) this.hud.draw(ctx, r, w, this.monarchs, focus);
         if (showHud && this.touchDevice()) this.drawTouchHints(ctx);
-        if (showHud) this.plaques.draw(ctx, r.w, r.h);
+        if (showHud) this.plaques.draw(ctx, r.w, r.h, w.time.isDay && w.time.phase > 0.04 && w.time.phase < 0.6);
         if (showHud && this.reroll && focus === this.monarchs[0]) {
           const touch = this.touchDevice();
           const hint = touch ? 'ТАП ПО МОНАРХУ — ДРУГОЙ ПРАВИТЕЛЬ' : 'S ИЛИ ВНИЗ — ДРУГОЙ ПРАВИТЕЛЬ';
@@ -779,7 +781,6 @@ export class App {
         this.dim(ctx, 0.6);
         drawText(ctx, 'КУДА ПЛЫТЬ?', cx, 14, { align: 'center', scale: 2 });
         drawMap(ctx, w, Math.floor(h * 0.7), this.world, this.campaign, this.monarchs.map((m) => m.x), this.chooseIndex);
-        drawText(ctx, `ОСТРОВ ${toRoman(this.chooseIndex)}`, cx, Math.floor(h * 0.72), { align: 'center', scale: 2, color: '#f2c84a' });
         if (this.touchDevice()) {
           drawText(ctx, 'КОСНИТЕСЬ ОСТРОВА, ЕЩЁ РАЗ — ОТПЛЫТЬ', cx, h - 40, { align: 'center', color: '#e0d4b8', outline: '#14100c' });
           const b = this.cancelRect();
@@ -806,13 +807,39 @@ export class App {
         break;
       }
       case 'victory': {
-        const a = Math.min(0.6, this.stateTime * 0.3);
-        this.dim(ctx, a);
-        this.plaques.drawSparks(ctx);
-        drawText(ctx, 'ПОБЕДА', cx, Math.floor(h * 0.3), { align: 'center', scale: 3, color: '#f2c84a' });
-        drawText(ctx, 'Все пять пещер Жадности разрушены.', cx, Math.floor(h * 0.3) + 30, { align: 'center' });
-        drawText(ctx, `Правлений: ${this.campaign.reign}. Дней последнего правления: ${this.world.time.day}.`, cx, Math.floor(h * 0.3) + 42, { align: 'center', color: '#d8ccb0' });
-        if (this.stateTime > 3) drawText(ctx, this.pressHint(), cx, Math.floor(h * 0.3) + 64, { align: 'center', color: '#f2c84a', outline: '#1a1208' });
+        // Победа — тёплый рассветный свет, а не сумрак: золотое сияние сверху.
+        const a = Math.min(1, this.stateTime * 0.5);
+        const g = ctx.createLinearGradient(0, 0, 0, h);
+        g.addColorStop(0, `rgba(255,214,140,${(0.34 * a).toFixed(3)})`);
+        g.addColorStop(0.6, `rgba(255,170,110,${(0.12 * a).toFixed(3)})`);
+        g.addColorStop(1, `rgba(20,10,20,${(0.35 * a).toFixed(3)})`);
+        ctx.fillStyle = g;
+        ctx.fillRect(0, 0, w, h);
+        this.plaques.drawSparks(ctx, this.world.time.isDay && this.world.time.phase > 0.04 && this.world.time.phase < 0.6);
+        // Праздничная доска с золотой рамкой.
+        const pw = Math.min(w - 20, 300);
+        const py = Math.floor(h * 0.4);
+        const ph = 78;
+        const px = Math.round(cx - pw / 2);
+        ctx.globalAlpha = a;
+        ctx.fillStyle = '#2a1608';
+        ctx.fillRect(px - 1, py - 1, pw + 2, ph + 2);
+        ctx.fillStyle = '#c89a3a';
+        ctx.fillRect(px, py, pw, ph);
+        ctx.fillStyle = '#f2d06a';
+        ctx.fillRect(px, py, pw, 1);
+        ctx.fillRect(px, py, 1, ph);
+        ctx.fillStyle = '#4a2c16';
+        ctx.fillRect(px + 2, py + 2, pw - 4, ph - 4);
+        ctx.fillStyle = '#5c381e';
+        for (let y = py + 4; y < py + ph - 3; y += 4) ctx.fillRect(px + 3, y, pw - 6, 1);
+        ctx.fillStyle = '#ffe070';
+        for (const [x0, y0] of [[px + 3, py + 3], [px + pw - 4, py + 3], [px + 3, py + ph - 4], [px + pw - 4, py + ph - 4]]) ctx.fillRect(x0, y0, 1, 1);
+        ctx.globalAlpha = 1;
+        drawText(ctx, 'ПОБЕДА', cx, py + 7, { align: 'center', scale: 3, color: '#ffe070', shadow: '#1a0c04', alpha: a });
+        drawText(ctx, 'Все пять пещер Жадности разрушены.', cx, py + 36, { align: 'center', color: '#f4ecd8', shadow: '#1a0c04', alpha: a });
+        drawText(ctx, `Правлений: ${this.campaign.reign}. Дней последнего правления: ${toRoman(this.world.time.day)}.`, cx, py + 48, { align: 'center', color: '#e8d8b0', shadow: '#1a0c04', alpha: a });
+        if (this.stateTime > 3) drawText(ctx, this.pressHint(), cx, py + 63, { align: 'center', color: '#ffe070', shadow: '#1a0c04' });
         break;
       }
       default:

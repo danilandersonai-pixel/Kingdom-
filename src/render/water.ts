@@ -27,8 +27,8 @@ export function drawWater(
   ctx.fillStyle = rgb(a.waterDeep);
   ctx.fillRect(0, waterTop, w, waterH);
 
-  // Зимой река замерзает: отражение почти не рябит.
-  const calm = 1 - frozen * 0.85;
+  // Зимой река замерзает: отражение почти не рябит; в ненастье — дрожит сильнее.
+  const calm = (1 - frozen * 0.85) * (1 + (1 - a.clear) * 0.7);
   for (let r = 0; r < waterH; r++) {
     const srcY = Math.max(0, waterTop - 1 - Math.floor(r * 1.02));
     const depth = r / waterH;

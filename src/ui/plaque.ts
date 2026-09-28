@@ -18,6 +18,8 @@ interface Spark {
   life: number;
   max: number;
   color: string;
+  /** Насыщенный цвет той же искры — для дневного неба. */
+  deep: string;
 }
 
 const DURATION = 6;
@@ -37,20 +39,21 @@ export class Plaques {
     return this.queue.length > 0;
   }
 
-  /** Салют без таблички (экран победы). */
+  /** Салют без таблички (экран победы): залпы по краям и над надписью. */
   celebrate(dt: number, w: number, h: number): void {
     this.burstT -= dt;
     if (this.burstT <= 0) {
-      this.burstT = fxRng.range(0.2, 0.45);
-      this.firework(fxRng.range(w * 0.12, w * 0.88), fxRng.range(h * 0.1, h * 0.45));
+      this.burstT = fxRng.range(0.18, 0.4);
+      const side = fxRng.chance(0.5) ? fxRng.range(w * 0.06, w * 0.3) : fxRng.range(w * 0.7, w * 0.94);
+      this.firework(fxRng.chance(0.7) ? side : fxRng.range(w * 0.3, w * 0.7), fxRng.range(h * 0.08, h * 0.3), true);
     }
   }
 
   /** Только искры (поверх затемнения экрана победы). */
-  drawSparks(ctx: CanvasRenderingContext2D): void {
+  drawSparks(ctx: CanvasRenderingContext2D, day = false): void {
     const q = this.queue;
     this.queue = [];
-    this.draw(ctx, 0, 0);
+    this.draw(ctx, 0, 0, day);
     this.queue = q;
   }
 
@@ -63,7 +66,9 @@ export class Plaques {
         this.burstT -= dt;
         if (this.burstT <= 0) {
           this.burstT = fxRng.range(0.25, 0.5);
-          this.firework(fxRng.range(w * 0.2, w * 0.8), fxRng.range(h * 0.08, h * 0.32));
+          // Слева и справа от таблички — не на верёвках и не на надписи.
+          const x = fxRng.chance(0.5) ? fxRng.range(w * 0.08, w * 0.28) : fxRng.range(w * 0.72, w * 0.92);
+          this.firework(x, fxRng.range(h * 0.08, h * 0.34));
         }
       }
       if (p.t > DURATION) this.queue.shift();
@@ -79,27 +84,33 @@ export class Plaques {
     this.sparks = this.sparks.filter((s) => s.life > 0);
   }
 
-  private firework(x: number, y: number): void {
-    const n = fxRng.int(18, 28);
-    const speed = fxRng.range(34, 52);
-    const warm = fxRng.chance(0.75);
+  private firework(x: number, y: number, festive = false): void {
+    const n = fxRng.int(20, 32);
+    const speed = fxRng.range(34, 56);
+    // Палитры залпов: золото, а на празднике победы — ещё алый, лазурь, изумруд, сирень.
+    const sets = festive
+      ? [['#fff6c8', '#ffe070', '#f2c84a'], ['#ffd0c0', '#ff6a4a', '#e8342a'], ['#e0f0ff', '#7ac0ff', '#3a7ad8'], ['#e0ffe8', '#6ae08a', '#2aa85a'], ['#f4e0ff', '#c88aff', '#8a4ad8']]
+      : [['#fff6c8', '#ffe070', '#f2c84a'], ['#fff6c8', '#ffe070', '#f2c84a'], ['#fff6c8', '#ffe070', '#f2c84a'], ['#ffffff', '#c8e8ff', '#8ac8ff']];
+    const pal = fxRng.pick(sets);
     for (let i = 0; i < n; i++) {
       const a = (i / n) * Math.PI * 2 + fxRng.range(-0.1, 0.1);
       const s = speed * fxRng.range(0.75, 1.05);
-      const life = fxRng.range(0.9, 1.5);
-      this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color: warm ? fxRng.pick(['#fff6c8', '#ffe070', '#f2c84a']) : fxRng.pick(['#ffffff', '#c8e8ff']) });
+      const life = fxRng.range(0.9, 1.6);
+      this.sparks.push({ x, y, vx: Math.cos(a) * s, vy: Math.sin(a) * s, life, max: life, color: fxRng.pick(pal), deep: fxRng.chance(0.6) ? pal[2] : pal[1] });
     }
   }
 
-  draw(ctx: CanvasRenderingContext2D, w: number, h: number): void {
-    // Искры салюта (складываются светом).
+  draw(ctx: CanvasRenderingContext2D, w: number, h: number, day = false): void {
+    // Искры салюта: ночью складываются светом, днём — плотные цветные точки
+    // (на светлом небе «свечение» выглядит бледным мусором).
     if (this.sparks.length) {
-      ctx.globalCompositeOperation = 'lighter';
+      ctx.globalCompositeOperation = day ? 'source-over' : 'lighter';
+      const size = day ? 2 : 1;
       for (const s of this.sparks) {
         const a = Math.min(1, (s.life / s.max) * 1.6);
         ctx.globalAlpha = a;
-        ctx.fillStyle = s.color;
-        ctx.fillRect(Math.round(s.x), Math.round(s.y), 1, 1);
+        ctx.fillStyle = day ? s.deep : s.color;
+        ctx.fillRect(Math.round(s.x), Math.round(s.y), size, size);
         // Хвостик.
         ctx.globalAlpha = a * 0.4;
         ctx.fillRect(Math.round(s.x - s.vx * 0.03), Math.round(s.y - s.vy * 0.03), 1, 1);

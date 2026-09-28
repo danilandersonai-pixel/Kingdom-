@@ -237,7 +237,10 @@ export class World {
     // Зимой на постройках снег (у деревьев он свой, торговцу на голову не сыплем).
     const winter = this.time.season === 'winter';
     for (const e of visible) {
-      if (winter) setSnowMode(e.tag === 'structure' && SNOWY.has((e as unknown as { type: string }).type));
+      if (winter) {
+        const st = e as unknown as { type: string; snowy?: boolean };
+        setSnowMode(e.tag === 'structure' && (st.snowy ?? SNOWY.has(st.type)));
+      }
       e.draw(ctx, r);
     }
     setSnowMode(false);

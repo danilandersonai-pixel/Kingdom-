@@ -22,6 +22,8 @@ const DONKEY = { ...HORSE, body: '#8a8078', mane: '#4a4440', socks: undefined, b
 /** Хижина торговца в лесу. */
 export class MerchantHut extends Structure {
   readonly type = 'merchant' as const;
+  /** Хижине — снег на крышу (самому торговцу — нет). */
+  readonly snowy = true;
   constructor(x: number) {
     super();
     this.x = x;

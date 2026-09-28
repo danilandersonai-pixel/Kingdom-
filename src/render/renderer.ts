@@ -2,7 +2,7 @@
 // → затемнение и свет → светящиеся объекты → отражение в воде → погода → интерфейс.
 
 import type { Screen } from '../engine/screen';
-import { makeCanvas, rgb } from '../engine/sprite';
+import { makeCanvas, rgb, mix } from '../engine/sprite';
 import { Background } from './background';
 import { Ground, GROUND_H } from './ground';
 import { Lighting, type Light } from './lighting';
@@ -74,6 +74,8 @@ export class Renderer {
   private sceneCopy!: HTMLCanvasElement;
   private fg!: HTMLCanvasElement;
   private fgCtx!: CanvasRenderingContext2D;
+  private gradeMask!: HTMLCanvasElement;
+  private gradeMaskCtx!: CanvasRenderingContext2D;
   private sceneCtx!: CanvasRenderingContext2D;
 
   groundY = 189;
@@ -107,6 +109,7 @@ export class Renderer {
     [this.world, this.worldCtx] = makeCanvas(w, h);
     [this.sceneCopy, this.sceneCtx] = makeCanvas(w, this.waterTop);
     [this.fg, this.fgCtx] = makeCanvas(w, h);
+    [this.gradeMask, this.gradeMaskCtx] = makeCanvas(w, h);
     this.lighting.resize(w, h);
   }
 
@@ -196,12 +199,20 @@ export class Renderer {
     ctx.globalCompositeOperation = 'source-over';
   }
 
-  /** Цветокоррекция слоя (только там, где есть пиксели): мир принимает тон неба. */
+  /** Цветокоррекция слоя умножением на цвет неба: тон меняется, тени не
+   *  светлеют. Прозрачность слоя сохраняется через маску. */
   private grade(c: CanvasRenderingContext2D, a: Atmosphere, y: number, hh: number): void {
     if (a.gradeAlpha < 0.01) return;
-    c.globalCompositeOperation = 'source-atop';
-    c.fillStyle = rgb(a.grade, a.gradeAlpha);
-    c.fillRect(0, y, this.screen.w, hh);
+    const w = this.screen.w;
+    const m = this.gradeMaskCtx;
+    m.globalCompositeOperation = 'copy';
+    m.drawImage(c.canvas, 0, y, w, hh, 0, y, w, hh);
+    m.globalCompositeOperation = 'source-over';
+    c.globalCompositeOperation = 'multiply';
+    c.fillStyle = rgb(mix([255, 255, 255], a.grade, a.gradeAlpha));
+    c.fillRect(0, y, w, hh);
+    c.globalCompositeOperation = 'destination-in';
+    c.drawImage(this.gradeMask, 0, y, w, hh, 0, y, w, hh);
     c.globalCompositeOperation = 'source-over';
   }
 

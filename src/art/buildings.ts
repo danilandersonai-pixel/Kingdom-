@@ -7,6 +7,7 @@ import { makeCanvas, type Sprite } from '../engine/sprite';
 import { Rng } from '../engine/rng';
 import { ellipse, line, poly, px, rect, shade } from './px';
 import { hash2 } from '../engine/math';
+import { rackItemSprite, type RackItem } from './items';
 
 const WOOD = '#7a5234';
 const WOOD_D = '#553823';
@@ -261,8 +262,32 @@ export function towerSprite(level: number): Sprite {
 export type ShopKind = 'bow' | 'hammer' | 'scythe' | 'shield' | 'bomb' | 'pike' | 'sword' | 'bread';
 const AWNING: Record<ShopKind, string> = { bow: '#4a7a3a', hammer: '#9a5a2a', scythe: '#c8a040', shield: '#a82a2a', bomb: '#5a5a6a', pike: '#6a4a8a', sword: '#4a4e56', bread: '#c87a3a' };
 
+const SHOP_SIGN: Partial<Record<ShopKind, RackItem>> = {
+  bow: 'bow',
+  hammer: 'hammer',
+  scythe: 'scythe',
+  shield: 'shield',
+  pike: 'pike',
+  sword: 'sword',
+  bread: 'bread',
+  bomb: 'bomb',
+};
+
 export function shopSprite(kind: ShopKind): Sprite {
-  return build(`shop:${kind}`, 24, 22, (ctx, w, h) => {
+  return build(`shop2:${kind}`, 24, 35, (ctx, w, hAll) => {
+    // Вывеска над навесом: дощечка со знаком товара — видно, что продают,
+    // даже когда стойка пуста.
+    const sign = SHOP_SIGN[kind];
+    rect(ctx, w / 2 - 6, 0, 12, 12, '#3a2616');
+    rect(ctx, w / 2 - 5, 1, 10, 10, '#c8b08a');
+    rect(ctx, w / 2 - 5, 1, 10, 1, '#e0cca4');
+    rect(ctx, w / 2 - 1, 12, 2, 2, WOOD_D);
+    if (sign) {
+      const icon = rackItemSprite(sign);
+      ctx.drawImage(icon.img, 0, 0, icon.w, icon.h, w / 2 - 4, 1, 9, 10);
+    }
+    ctx.translate(0, 13);
+    const h = hAll - 13;
     const aw = AWNING[kind];
     rect(ctx, 2, 6, 2, h - 6, WOOD);
     rect(ctx, w - 4, 6, 2, h - 6, WOOD);
@@ -286,11 +311,15 @@ export function farmSprite(stage: number, winter: boolean, built: boolean): Spri
   const key = `farm:${stage}:${winter}:${built}`;
   return build(key, 48, 14, (ctx, w, h) => {
     if (!built) {
-      // Плодородная земля с колышком.
-      rect(ctx, 2, h - 2, w - 4, 2, '#4a3222');
-      for (let x = 3; x < w - 3; x += 3) px(ctx, x, h - 2, '#6a4a30');
-      rect(ctx, 5, h - 7, 1, 5, WOOD);
-      rect(ctx, 3, h - 8, 5, 2, '#c8b890');
+      // Заброшенная пашня: старые борозды, сорная трава, пара кочек.
+      rect(ctx, 2, h - 3, w - 4, 3, '#4a3222');
+      for (let x = 2; x < w - 2; x++) {
+        px(ctx, x, h - 3, x % 3 === 0 ? '#34221a' : winter ? '#dfe7f0' : '#6a4a30');
+        if (!winter && hash2(x, 3) > 0.72) {
+          const gh = 1 + Math.floor(hash2(x, 4) * 3);
+          line(ctx, x, h - 4, x, h - 3 - gh, hash2(x, 5) > 0.5 ? '#6a8a3a' : '#8a9a4a');
+        }
+      }
       return;
     }
     // Вспаханные борозды: гребни светлее, между ними тень.

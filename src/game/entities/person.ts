@@ -694,7 +694,9 @@ export class Person extends Entity {
     const side = w.hornCall && (this.role === 'archer' || this.isSoldier) ? w.hornCall : this.side;
     const ow = outerWall(w, side);
     const edge = ow ? ow.x : kingdomEdge(w, side);
-    const pos = edge - side * (inside + (this.rank % 6) * 5);
+    // Не частокол: интервалы у каждого свои (стабильно — по номеру жителя).
+    const jitter = ((this.id * 37) % 7) - 3;
+    const pos = edge - side * (inside + (this.rank % 6) * 6 + jitter);
     if (Math.abs(this.x - pos) > 3) this.goTo(pos, !w.time.isDay || Math.abs(this.x - pos) > 60);
     else if (this.arrived) this.facing = side;
   }

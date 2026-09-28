@@ -196,8 +196,40 @@ function drawRaw(ctx: CanvasRenderingContext2D, text: string, x: number, y: numb
   }
 }
 
+// Готовые строки: текст с тенью или обводкой рисуется один раз на отдельный
+// холст, потом — одним drawImage (обводка — это 9 проходов по каждой букве).
+interface TextImage {
+  img: HTMLCanvasElement;
+  pad: number;
+}
+const textCache = new Map<string, TextImage>();
+const TEXT_CACHE_MAX = 300;
+
+function textImage(text: string, color: string, scale: number, shadow: string | null, outline: string | null): TextImage {
+  const key = `${text}\u0001${color}\u0001${scale}\u0001${shadow}\u0001${outline}`;
+  let t = textCache.get(key);
+  if (t) {
+    textCache.delete(key);
+    textCache.set(key, t);
+    return t;
+  }
+  const pad = scale;
+  const [c, ctx] = makeCanvas(textWidth(text, scale) + pad * 2 + scale, GLYPH_H * scale + pad * 2 + scale);
+  if (outline) {
+    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) drawRaw(ctx, text, pad + dx * scale, pad + dy * scale, outline, scale);
+  } else if (shadow) {
+    drawRaw(ctx, text, pad + scale, pad + scale, shadow, scale);
+  }
+  drawRaw(ctx, text, pad, pad, color, scale);
+  t = { img: c, pad };
+  textCache.set(key, t);
+  while (textCache.size > TEXT_CACHE_MAX) textCache.delete(textCache.keys().next().value as string);
+  return t;
+}
+
 /** Рисует строку текста; y — верхний край букв. */
 export function drawText(ctx: CanvasRenderingContext2D, text: string, x: number, y: number, opts: TextOpts = {}): void {
+  if (!text) return;
   const scale = opts.scale ?? 1;
   const color = opts.color ?? '#f4ecd8';
   const w = textWidth(text, scale);
@@ -206,14 +238,9 @@ export function drawText(ctx: CanvasRenderingContext2D, text: string, x: number,
   else if (opts.align === 'right') left = x - w;
   const prevAlpha = ctx.globalAlpha;
   if (opts.alpha !== undefined) ctx.globalAlpha = prevAlpha * opts.alpha;
-  if (opts.outline) {
-    for (const [dx, dy] of [[-1, 0], [1, 0], [0, -1], [0, 1], [-1, -1], [1, 1], [-1, 1], [1, -1]]) {
-      drawRaw(ctx, text, left + dx * scale, y + dy * scale, opts.outline, scale);
-    }
-  } else if (opts.shadow !== null) {
-    drawRaw(ctx, text, left + scale, y + scale, opts.shadow ?? 'rgba(0,0,0,0.55)', scale);
-  }
-  drawRaw(ctx, text, left, y, color, scale);
+  const shadow = opts.outline ? null : opts.shadow === null ? null : (opts.shadow ?? 'rgba(0,0,0,0.55)');
+  const t = textImage(text, color, scale, shadow, opts.outline ?? null);
+  ctx.drawImage(t.img, Math.round(left) - t.pad, Math.round(y) - t.pad);
   ctx.globalAlpha = prevAlpha;
 }
 

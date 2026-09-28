@@ -39,6 +39,55 @@ function streamSprite(): Sprite {
   return streamCache;
 }
 
+/** Родник под будущую ферму: прудик в каменном ободке, рогоз, колышек с
+ *  дощечкой-колосом — издалека видно, что здесь можно завести хозяйство. */
+const springCache = new Map<boolean, Sprite>();
+function springSprite(winter: boolean): Sprite {
+  let sp = springCache.get(winter);
+  if (sp) return sp;
+  const W = 30;
+  const H = 16;
+  const [c, ctx] = makeCanvas(W, H);
+  const cx = 14;
+  const wy = H - 3;
+  // Каменный ободок.
+  for (let x = cx - 12; x <= cx + 12; x++) {
+    const k = (x - cx) / 12.5;
+    const top = Math.round(wy - 2.6 * Math.sqrt(Math.max(0, 1 - k * k)));
+    px(ctx, x, top, (x & 1) === 0 ? '#8a8a90' : '#6e6e76');
+    if ((x & 3) === 0) px(ctx, x, top - 1, '#a8a8b0');
+  }
+  // Вода (зимой — лёд).
+  ellipse(ctx, cx, wy, 10.5, 2.4, winter ? '#b8cce0' : '#3a6a8a');
+  if (winter) {
+    px(ctx, cx - 5, wy - 1, '#eef4fa');
+    px(ctx, cx + 3, wy, '#eef4fa');
+  } else {
+    px(ctx, cx - 5, wy - 1, '#8ac0dc');
+    px(ctx, cx - 4, wy - 1, '#8ac0dc');
+    px(ctx, cx + 4, wy, '#6aa0c0');
+    // Лист кувшинки.
+    px(ctx, cx + 1, wy - 1, '#4a7a36');
+    px(ctx, cx + 2, wy - 1, '#5a8a3e');
+  }
+  // Рогоз у левого края.
+  for (const [x, hh] of [[cx - 10, 8], [cx - 8, 11], [cx - 6, 7]] as Array<[number, number]>) {
+    for (let y = 0; y < hh; y++) px(ctx, x, wy - 1 - y, winter ? '#9a8a6a' : y > hh - 3 ? '#8a9a4a' : '#5a7a34');
+    rect(ctx, x, wy - hh + 1, 1, 3, winter ? '#6a5a42' : '#6a4424');
+  }
+  // Колышек с дощечкой, на ней колос.
+  rect(ctx, cx + 11, H - 13, 1, 11, '#6a4a2a');
+  rect(ctx, cx + 9, H - 14, 6, 4, '#c8b890');
+  rect(ctx, cx + 9, H - 14, 6, 1, '#e0d0a8');
+  px(ctx, cx + 11, H - 13, '#c89a2a');
+  px(ctx, cx + 12, H - 12, '#c89a2a');
+  px(ctx, cx + 11, H - 11, '#c89a2a');
+  if (winter) rect(ctx, cx + 9, H - 15, 6, 1, '#f4f8fc');
+  sp = { img: c, w: W, h: H, ax: cx, ay: H - 1 };
+  springCache.set(winter, sp);
+  return sp;
+}
+
 export type FarmStage = 'site' | 'well' | 'mill' | 'stable';
 
 export class Farm extends Structure implements FarmLike {
@@ -147,8 +196,8 @@ export class Farm extends Structure implements FarmLike {
     const gy = r.sy(0);
     const winter = this.world.time.season === 'winter';
     if (this.stage === 'site') {
-      blit(ctx, streamSprite(), sx, gy + 1);
-      blit(ctx, farmSprite(0, winter, false), sx + 24, gy);
+      blit(ctx, farmSprite(0, winter, false), sx + 26, gy);
+      blit(ctx, springSprite(winter), sx, gy + 3);
     } else {
       for (const f of this.fields) {
         const stage = f.farmerId ? Math.min(3, Math.floor((f.progress / PEOPLE.fieldWork) * 4)) : 0;
