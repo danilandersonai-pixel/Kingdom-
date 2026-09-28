@@ -172,6 +172,16 @@ export class App {
         if (this.world !== world) return;
         this.hud.showDay(d);
         if (DayCycle.isBloodMoonDay(d - 1) && this.monarchs.some((m) => m.hasCrown)) this.moment('', 'КРОВАВАЯ ЛУНА ПОЗАДИ', 'Королевство выстояло');
+        else if (d > 1 && world.time.dayInSeason === 1) {
+          const seasons: Record<string, [string, string]> = {
+            spring: ['ВЕСНА', 'Трава отрастает — кони пасутся, поля зеленеют'],
+            summer: ['ЛЕТО', 'Долгие дни и тёплые ночи'],
+            autumn: ['ОСЕНЬ', 'Дожди и листопад — готовьтесь к зиме'],
+            winter: ['ЗИМА', 'Поля и пастбища под снегом — берегите монеты'],
+          };
+          const [t, sub] = seasons[world.time.season];
+          world.banner(t, sub, 6);
+        }
         this.autosave();
       });
       world.on('moment', (key: string, title: string, sub: string) => this.moment(key, title, sub));
@@ -507,6 +517,7 @@ export class App {
         }
         break;
     }
+    if (this.state === 'victory') this.plaques.celebrate(dt, this.screen.w, this.screen.h);
     this.plaques.update(dt, this.screen.w, this.screen.h);
     this.renderer.update(dt);
     const t = this.world.time;
@@ -733,6 +744,7 @@ export class App {
       case 'victory': {
         const a = Math.min(0.6, this.stateTime * 0.3);
         this.dim(ctx, a);
+        this.plaques.drawSparks(ctx);
         drawText(ctx, 'ПОБЕДА', cx, Math.floor(h * 0.3), { align: 'center', scale: 3, color: '#f2c84a' });
         drawText(ctx, 'Все пять пещер Жадности разрушены.', cx, Math.floor(h * 0.3) + 30, { align: 'center' });
         drawText(ctx, `Правлений: ${this.campaign.reign}. Дней последнего правления: ${this.world.time.day}.`, cx, Math.floor(h * 0.3) + 42, { align: 'center', color: '#d8ccb0' });

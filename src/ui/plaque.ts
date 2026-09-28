@@ -37,6 +37,23 @@ export class Plaques {
     return this.queue.length > 0;
   }
 
+  /** Салют без таблички (экран победы). */
+  celebrate(dt: number, w: number, h: number): void {
+    this.burstT -= dt;
+    if (this.burstT <= 0) {
+      this.burstT = fxRng.range(0.2, 0.45);
+      this.firework(fxRng.range(w * 0.12, w * 0.88), fxRng.range(h * 0.1, h * 0.45));
+    }
+  }
+
+  /** Только искры (поверх затемнения экрана победы). */
+  drawSparks(ctx: CanvasRenderingContext2D): void {
+    const q = this.queue;
+    this.queue = [];
+    this.draw(ctx, 0, 0);
+    this.queue = q;
+  }
+
   update(dt: number, w: number, h: number): void {
     const p = this.queue[0];
     if (p) {
