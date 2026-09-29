@@ -86,6 +86,7 @@ npm run typecheck  # проверка типов
 npm run build      # сборка в один файл dist/index.html
 npm run build:artifact  # страница для публикации ссылкой: dist/korolevstvo.html
 npm run build:itch      # архив для itch.io: dist/korolevstvo-itch.zip
+npm run build:web       # игра в docs/index.html — для githack и GitHub Pages
 ```
 
 Тесты детерминированы: случайность визуальных эффектов в них засеяна фиксированно. Чтобы прогнать игру на другой последовательности, задайте посев: `TEST_SEED=73 npm test`.
@@ -99,7 +100,11 @@ npm run build:itch      # архив для itch.io: dist/korolevstvo-itch.zip
   2. Создайте проект с типом *HTML*.
   3. Загрузите `dist/korolevstvo-itch.zip` и отметьте «This file will be played in the browser».
   4. Размер окна — 960×540; включите кнопку полноэкранного режима и пометку *Mobile friendly*.
-- **GitHub Pages, Netlify и похожие:** выложите `dist/index.html` как главную страницу.
+- **Ссылка через githack (без хостинга):** выполните `npm run build:web`, закоммитьте `docs/index.html` и отправьте изменения на GitHub. Игра откроется по ссылке:
+  - `https://raw.githack.com/danilandersonai-pixel/Kingdom-/<ветка>/docs/index.html` — всегда последняя версия из ветки;
+  - `https://rawcdn.githack.com/danilandersonai-pixel/Kingdom-/<коммит>/docs/index.html` — постоянная ссылка на конкретную версию через CDN, лучше всего подходит, чтобы поделиться.
+- **GitHub Pages:** в настройках репозитория (Settings → Pages) выберите ветку и папку `/docs`.
+- **Netlify и похожие:** выложите `dist/index.html` как главную страницу.
 
 Параметры адреса для отладки:
 
